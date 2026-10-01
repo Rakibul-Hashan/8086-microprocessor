@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Intel 8086 — Interactive 3D Pin Explorer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:#0b1020;font-family:ui-sans-serif,system-ui,sans-serif}
+#view{touch-action:none;cursor:grab}#view:active{cursor:grabbing}
+</style>
+</head>
+<body class="text-slate-200">
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <section class="relative lg:flex-1 h-[55vh] lg:h-screen lg:sticky lg:top-0" id="wrap">
+    <canvas id="view" class="w-full h-full block"></canvas>
+    <div class="absolute top-3 left-3 pointer-events-none">
+      <h1 class="text-xl font-bold text-white">Intel 8086</h1>
+      <p class="text-xs text-slate-400">16-bit microprocessor · 40-pin DIP · drag to rotate, scroll to zoom, click a pin</p>
+    </div>
+    <div class="absolute bottom-3 left-3 flex flex-wrap gap-2 text-xs">
+      <button id="bTop" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">Top view</button>
+      <button id="b3d" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">3D view</button>
+      <button id="bSpin" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">Auto-spin: off</button>
+      <button id="bLbl" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">Labels: on</button>
+    </div>
+    <div id="tip" class="hidden fixed pointer-events-none z-20 px-2 py-1 rounded bg-black/80 text-xs"></div>
+  </section>
+
+  <aside class="lg:w-[420px] bg-slate-900/80 border-l border-slate-800 p-4 space-y-4">
+    <div class="flex items-center justify-between">
+      <span class="text-sm text-slate-400">Operating mode</span>
+      <div class="inline-flex rounded overflow-hidden border border-slate-700 text-sm">
+        <button id="mMin" class="px-3 py-1.5">Minimum</button>
+        <button id="mMax" class="px-3 py-1.5">Maximum</button>
+      </div>
+    </div>
+    <p id="modeNote" class="text-xs text-slate-400"></p>
+
+    <div id="card" class="rounded-lg border border-slate-700 bg-slate-800/60 p-4 min-h-[170px]"></div>
+
+    <div>
+      <h2 class="text-sm font-semibold mb-2">Filter by function</h2>
+      <div id="chips" class="flex flex-wrap gap-2 text-xs"></div>
+    </div>
+
+    <div>
+      <h2 class="text-sm font-semibold mb-2">All pins</h2>
+      <div id="list" class="grid grid-cols-2 gap-1.5 text-xs"></div>
+    </div>
+
+    <div class="rounded-lg border border-slate-700 p-4 text-xs text-slate-300 space-y-1">
+      <h2 class="text-sm font-semibold text-white mb-1">Quick facts</h2>
+      <p>• Released by Intel in 1978; ~29,000 transistors, HMOS</p>
+      <p>• 16-bit data bus, 20-bit address bus → 1 MB memory (00000h–FFFFFh)</p>
+      <p>• Clock 5 MHz (8086), 8 MHz (8086-1), 10 MHz (8086-2); supply +5 V</p>
+      <p>• Two units: Bus Interface Unit (BIU, 6-byte prefetch queue) and Execution Unit (EU)</p>
+      <p>• Reset vector: CS:IP = FFFFh:0000h → physical address FFFF0h</p>
+      <p>• 64 KB I/O space; 256 interrupt vectors</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+const T={pwr:['Power','#ef4444'],ad:['Address / Data','#3b82f6'],ctl:['Control','#f59e0b'],int:['Interrupt','#a855f7'],sta:['Status / Queue','#14b8a6'],clk:['Clock','#22c55e']};
+const ADD='Time-multiplexed address/data bus. Carries address bit during T1 and data bit during T2–T4; tri-stated when the bus is released.';
+const P={};
+const def=(n,max,min,type,dir,desc)=>P[n]={n,max,min,type,dir,desc};
+def(1,'GND','GND','pwr','—','Ground (0 V). Pins 1 and 20 are both ground and both must be connected.');
+for(let i=2;i<=16;i++){const b=16-i;def(i,'AD'+b,'AD'+b,'ad','I/O',ADD+(b===0?' AD0 also selects the low byte of a 16-bit word (A0).':''))}
+def(17,'NMI','NMI','int','In','Non-Maskable Interrupt. Rising-edge triggered; cannot be disabled by software. Vectors to interrupt type 2.');
+def(18,'INTR','INTR','int','In','Interrupt Request. Level-triggered input sampled at the end of each instruction; masked by the IF flag.');
+def(19,'CLK','CLK','clk','In','System clock (33% duty cycle). Provides the basic timing for the processor and bus controller.');
+def(20,'GND','GND','pwr','—','Ground (0 V). Second ground pin.');
+def(21,'RESET','RESET','ctl','In','Resets the CPU: clears flags, IP, DS, SS, ES; sets CS = FFFFh so execution starts at FFFF0h. Must be high for at least 4 clocks.');
+def(22,'READY','READY','ctl','In','Acknowledge from memory or I/O that the transfer is complete. If low, the CPU inserts wait states (Tw).');
+def(23,'TEST','TEST','ctl','In','Examined by the WAIT instruction. The CPU idles until TEST goes low — used for synchronising with an 8087 coprocessor.');
+def(24,'QS1','INTA','sta','Out','MIN: INTA — interrupt acknowledge, read strobe for the interrupt vector.\nMAX: QS1 — with QS0, shows instruction queue status (00 none, 01 first byte, 10 queue empty, 11 subsequent byte).');
+def(25,'QS0','ALE','sta','Out','MIN: ALE — Address Latch Enable; latches the address from AD0–AD15 / A16–A19 at the start of a cycle.\nMAX: QS0 — low bit of the queue status.');
+def(26,'S0','DEN','sta','Out','MIN: DEN — Data Enable; enables transceivers (e.g. 8286) to drive the data bus.\nMAX: S0 — bus cycle status bit, decoded by the 8288.');
+def(27,'S1','DT/R','sta','Out','MIN: DT/R — Data Transmit/Receive; sets transceiver direction (high = transmit/write).\nMAX: S1 — bus cycle status bit.');
+def(28,'S2','M/IO','sta','Out','MIN: M/IO — high selects memory, low selects an I/O port.\nMAX: S2 — bus cycle status bit (S2S1S0 encodes interrupt ack, I/O read/write, halt, code fetch, memory read/write).');
+def(29,'LOCK','WR','ctl','Out','MIN: WR — write strobe; low when the CPU writes memory or I/O.\nMAX: LOCK — low prevents other bus masters from taking the bus (used with the LOCK prefix).');
+def(30,'RQ/GT1','HLDA','ctl','I/O','MIN: HLDA — Hold Acknowledge; CPU grants the bus to a DMA controller.\nMAX: RQ/GT1 — bus request/grant line with lower priority than RQ/GT0.');
+def(31,'RQ/GT0','HOLD','ctl','I/O','MIN: HOLD — DMA controller requests control of the bus.\nMAX: RQ/GT0 — bidirectional bus request/grant line (higher priority than RQ/GT1).');
+def(32,'RD','RD','ctl','Out','Read strobe. Low when the CPU is reading from memory or an I/O port.');
+def(33,'MN/MX','MN/MX','ctl','In','Mode select. High (tie to +5 V) = Minimum mode, single processor. Low (tie to GND) = Maximum mode, multiprocessor system with an 8288 bus controller.');
+def(34,'BHE/S7','BHE/S7','ctl','Out','Bus High Enable. Low means the upper byte (D15–D8) is being used. Together with A0 it selects byte / word access. S7 is reserved.');
+const up={35:'A19/S6',36:'A18/S5',37:'A17/S4',38:'A16/S3'};
+for(let i=35;i<=38;i++)def(i,up[i],up[i],'ad','Out','Upper address bit during T1, then status during T2–T4. S3/S4 identify the active segment register (00 ES, 01 SS, 10 CS/none, 11 DS); S5 reflects the IF flag; S6 is always 0.');
+def(39,'AD15','AD15','ad','I/O',ADD);
+def(40,'Vcc','Vcc','pwr','—','+5 V ±10% power supply.');
+
+let mode='min',filter='all',sel=null,hov=null,labels=true,spin=false;
+const nm=p=>mode==='min'?p.min:p.max;
+
+/* ---------- three.js ---------- */
+const cv=document.getElementById('view'),wrap=document.getElementById('wrap');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));
+const S=new THREE.Scene();S.background=new THREE.Color(0x0b1020);
+const cam=new THREE.PerspectiveCamera(40,1,.1,100);cam.position.set(0,0,19);
+S.add(new THREE.AmbientLight(0xffffff,.6));
+const dl=new THREE.DirectionalLight(0xffffff,.9);dl.position.set(5,10,12);S.add(dl);
+const pl=new THREE.PointLight(0x6688ff,.6);pl.position.set(-8,-4,8);S.add(pl);
+const G=new THREE.Group();S.add(G);
+
+const body=new THREE.Mesh(new THREE.BoxGeometry(3.6,.7,10.6),new THREE.MeshStandardMaterial({color:0x14161c,roughness:.55,metalness:.15}));G.add(body);
+const notch=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.04,32),new THREE.MeshStandardMaterial({color:0x05060a}));notch.position.set(0,.36,-5.3);G.add(notch);
+const dot=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.04,20),new THREE.MeshStandardMaterial({color:0xcccccc}));dot.position.set(-1.35,.36,-4.5);G.add(dot);
+const lc=document.createElement('canvas');lc.width=512;lc.height=256;const lx=lc.getContext('2d');
+lx.fillStyle='#d4d4d8';lx.textAlign='center';lx.font='bold 110px sans-serif';lx.fillText('8086',256,140);
+lx.font='28px sans-serif';lx.fillText('INTEL  16-BIT CPU',256,200);
+const plate=new THREE.Mesh(new THREE.PlaneGeometry(3.2,1.6),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(lc),transparent:true}));
+plate.rotation.x=-Math.PI/2;plate.rotation.z=-Math.PI/2;plate.position.y=.37;G.add(plate);
+
+const hit=[],pins={};
+function lbl(text,col,right){const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');x.font='bold 30px monospace';x.fillStyle=col;x.textBaseline='middle';x.textAlign=right?'left':'right';x.fillText(text,right?8:248,32);return new THREE.CanvasTexture(c)}
+for(let n=1;n<=40;n++){
+  const left=n<=20,x=left?-1:1,z=left?-4.75+(n-1)*.5:4.75-(n-21)*.5;
+  const mat=new THREE.MeshStandardMaterial({color:0xcbd5e1,metalness:.7,roughness:.3});
+  const g=new THREE.Group();
+  const a=new THREE.Mesh(new THREE.BoxGeometry(.8,.1,.22),mat);a.position.set(x*2.1,.0,z);
+  const b=new THREE.Mesh(new THREE.BoxGeometry(.1,.8,.22),mat);b.position.set(x*2.45,-.35,z);
+  a.userData.n=b.userData.n=n;g.add(a,b);G.add(g);hit.push(a,b);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({depthTest:false,transparent:true}));
+  sp.scale.set(2,.5,1);sp.center.set(left?1:0,.5);sp.position.set(x*2.75,-.1,z);sp.renderOrder=5;G.add(sp);
+  pins[n]={mat,sp,right:!left};
+}
+function paint(){
+  for(const n in pins){
+    const p=P[n],o=pins[n],col=T[p.type][1],dim=filter!=='all'&&p.type!==filter,on=sel===+n,h=hov===+n;
+    o.mat.color.set(dim?0x2a3142:col);
+    o.mat.emissive.set(dim?0x000000:col);o.mat.emissiveIntensity=on?1.1:h?.7:.15;
+    o.sp.material.map=lbl(n+' '+nm(p),dim?'#4b5568':(on?'#ffffff':'#cbd5e1'),o.right);
+    if(!o.right)o.sp.material.map=lbl(nm(p)+' '+n,dim?'#4b5568':(on?'#ffffff':'#cbd5e1'),false);
+    o.sp.material.needsUpdate=true;o.sp.visible=labels;
+  }
+}
+
+/* orbit */
+let tx=.9,ty=-.6,cx=tx,cy=ty,drag=false,moved=0,lastX=0,lastY=0;
+cv.addEventListener('pointerdown',e=>{drag=true;moved=0;lastX=e.clientX;lastY=e.clientY;cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointerup',e=>{drag=false;if(moved<5){const n=pick(e);if(n)select(n)}});
+cv.addEventListener('pointermove',e=>{
+  if(drag){const dx=e.clientX-lastX,dy=e.clientY-lastY;moved+=Math.abs(dx)+Math.abs(dy);ty+=dx*.008;tx+=dy*.008;lastX=e.clientX;lastY=e.clientY;cx=tx;cy=ty;tip(null);return}
+  const n=pick(e);if(n!==hov){hov=n;paint();cv.style.cursor=n?'pointer':'grab'}tip(n,e);
+});
+cv.addEventListener('pointerleave',()=>{hov=null;tip(null);paint()});
+cv.addEventListener('wheel',e=>{e.preventDefault();cam.position.z=Math.min(30,Math.max(8,cam.position.z+e.deltaY*.01))},{passive:false});
+const rc=new THREE.Raycaster(),mv=new THREE.Vector2();
+function pick(e){const r=cv.getBoundingClientRect();mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);rc.setFromCamera(mv,cam);const h=rc.intersectObjects(hit,false)[0];return h?h.object.userData.n:null}
+const tipEl=document.getElementById('tip');
+function tip(n,e){if(!n){tipEl.classList.add('hidden');return}const p=P[n];tipEl.textContent='Pin '+n+' · '+nm(p);tipEl.style.left=(e.clientX+14)+'px';tipEl.style.top=(e.clientY+14)+'px';tipEl.classList.remove('hidden')}
+
+function size(){const w=wrap.clientWidth,h=wrap.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',size);size();
+(function loop(){requestAnimationFrame(loop);if(spin&&!drag){ty+=.006}
+  cx+=(tx-cx)*.12;cy+=(ty-cy)*.12;G.rotation.set(cx,cy,0);R.render(S,cam)})();
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+function card(){
+  const el=$('card');
+  if(!sel){el.innerHTML='<p class="text-slate-400 text-sm">Click any pin on the chip (or in the list below) to see its name, function and direction.</p>';return}
+  const p=P[sel],c=T[p.type][1];
+  const alt=p.max!==p.min?`<p class="text-xs text-slate-400 mt-1">Min mode: <b class="text-slate-200">${p.min}</b> · Max mode: <b class="text-slate-200">${p.max}</b></p>`:'';
+  el.innerHTML=`<div class="flex items-center gap-3"><div class="w-11 h-11 rounded-full grid place-items-center font-bold text-slate-900" style="background:${c}">${p.n}</div>
+  <div><div class="text-xl font-bold text-white">${nm(p)}</div><div class="text-xs"><span style="color:${c}">${T[p.type][0]}</span> · Direction: ${p.dir}</div></div></div>${alt}
+  <p class="text-sm mt-3 whitespace-pre-line text-slate-300">${p.desc}</p>`;
+}
+function select(n){sel=n;card();paint();buildList()}
+function buildList(){
+  $('list').innerHTML='';
+  for(let n=1;n<=40;n++){const p=P[n],dim=filter!=='all'&&p.type!==filter;
+    const b=document.createElement('button');
+    b.className='flex items-center gap-2 px-2 py-1.5 rounded text-left border '+(sel===n?'border-white bg-slate-700':'border-slate-800 bg-slate-800/50 hover:bg-slate-800')+(dim?' opacity-30':'');
+    b.innerHTML=`<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${T[p.type][1]}"></span><span class="text-slate-400 w-5">${n}</span><span class="truncate">${nm(p)}</span>`;
+    b.onclick=()=>select(n);$('list').appendChild(b)}
+}
+function buildChips(){
+  const defs=[['all','All','#94a3b8'],...Object.entries(T).map(([k,v])=>[k,v[0],v[1]])];
+  $('chips').innerHTML='';
+  defs.forEach(([k,l,c])=>{const b=document.createElement('button');
+    b.className='px-2.5 py-1 rounded-full border '+(filter===k?'bg-slate-700 border-white':'border-slate-700 hover:bg-slate-800');
+    b.innerHTML=`<span class="inline-block w-2 h-2 rounded-full mr-1.5" style="background:${c}"></span>${l}`;
+    b.onclick=()=>{filter=k;buildChips();paint();buildList()};$('chips').appendChild(b)});
+}
+function setMode(m){mode=m;
+  $('mMin').className='px-3 py-1.5 '+(m==='min'?'bg-blue-600 text-white':'bg-slate-800');
+  $('mMax').className='px-3 py-1.5 '+(m==='max'?'bg-blue-600 text-white':'bg-slate-800');
+  $('modeNote').textContent=m==='min'?'Minimum mode (MN/MX = +5 V): single-processor system; the 8086 generates all bus control signals itself (pins 24–31 = INTA, ALE, DEN, DT/R, M/IO, WR, HLDA, HOLD).':'Maximum mode (MN/MX = GND): multiprocessor system; pins 24–31 carry QS1, QS0, S0, S1, S2, LOCK, RQ/GT1, RQ/GT0 and an 8288 bus controller decodes them.';
+  card();paint();buildList()}
+$('mMin').onclick=()=>setMode('min');$('mMax').onclick=()=>setMode('max');
+$('bTop').onclick=()=>{tx=Math.PI/2;ty=0;spin=false;$('bSpin').textContent='Auto-spin: off'};
+$('b3d').onclick=()=>{tx=.9;ty=-.6;cam.position.z=19};
+$('bSpin').onclick=()=>{spin=!spin;$('bSpin').textContent='Auto-spin: '+(spin?'on':'off')};
+$('bLbl').onclick=()=>{labels=!labels;$('bLbl').textContent='Labels: '+(labels?'on':'off');paint()};
+buildChips();setMode('min');
+</script>
+</body>
+</html>

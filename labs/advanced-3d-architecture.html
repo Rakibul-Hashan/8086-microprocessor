@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intel 8086 Microprocessor 3D Architecture (Fig 6.2)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Fira Code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        biu: '#0284c7',
+                        eu: '#f43f5e',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Smooth scrollbars */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.7); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Glassmorphism panels */
+        .glass-panel {
+            background: rgba(10, 15, 29, 0.82);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Subtle grid background */
+        .cyber-grid {
+            background-size: 32px 32px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        }
+
+        #hover-tooltip {
+            pointer-events: none;
+            transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+        }
+    </style>
+</head>
+<body class="h-full w-full overflow-hidden select-none bg-slate-950 font-sans cyber-grid">
+    <!-- Top Navigation Header -->
+    <header class="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-5 py-3 glass-panel border-b border-slate-800/90 shadow-xl">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-3">
+                <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-cyan-600 via-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 ring-1 ring-white/20">
+                    <i class="fa-solid fa-microchip text-slate-950 text-lg font-bold"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm sm:text-base font-bold tracking-tight text-white flex items-center gap-2">
+                        Intel 8086 <span class="text-[10px] px-2 py-0.5 rounded font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">FIG. 6.2 INTERNAL ARCHITECTURE</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400 hidden sm:block">Ultra-HD 3D Block Diagram • Accurate Bus Conduits & Directional Arrows</p>
+                </div>
+            </div>
+
+            <!-- BIU / EU Legend Badges -->
+            <div class="hidden lg:flex items-center space-x-2 pl-4 border-l border-slate-800 text-xs">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-950/70 border border-sky-500/40 text-sky-300">
+                    <span class="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_8px_#38bdf8]"></span>
+                    BIU (Bus Interface Unit)
+                </span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-950/70 border border-rose-500/40 text-rose-300">
+                    <span class="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_#fb7185]"></span>
+                    EU (Execution Unit)
+                </span>
+            </div>
+        </div>
+
+        <!-- Controls: Camera Presets & Search -->
+        <div class="flex items-center space-x-2.5">
+            <!-- Jump to Component -->
+            <div class="relative hidden md:block">
+                <i class="fa-solid fa-crosshairs absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <select id="component-select" class="pl-8 pr-7 py-1.5 bg-slate-900 text-xs text-slate-200 border border-slate-700/80 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 cursor-pointer appearance-none">
+                    <option value="">Jump to Block...</option>
+                    <optgroup label="Bus Interface Unit (BIU)">
+                        <option value="mem_interface">Memory Interface</option>
+                        <option value="adder">Σ Dedicated 20-bit Adder</option>
+                        <option value="reg_es">ES (Extra Segment)</option>
+                        <option value="reg_cs">CS (Code Segment)</option>
+                        <option value="reg_ss">SS (Stack Segment)</option>
+                        <option value="reg_ds">DS (Data Segment)</option>
+                        <option value="reg_ip">IP (Instruction Pointer)</option>
+                        <option value="queue">6-Byte Instruction Queue</option>
+                    </optgroup>
+                    <optgroup label="Execution Unit (EU)">
+                        <option value="control">Control System</option>
+                        <option value="alu">Arithmetic Logic Unit (ALU)</option>
+                        <option value="flags">Operands & Flags</option>
+                        <option value="reg_ax">AH / AL (AX Accumulator)</option>
+                        <option value="reg_bx">BH / BL (BX Base)</option>
+                        <option value="reg_cx">CH / CL (CX Count)</option>
+                        <option value="reg_dx">DH / DL (DX Data)</option>
+                        <option value="reg_sp">SP (Stack Pointer)</option>
+                        <option value="reg_bp">BP (Base Pointer)</option>
+                        <option value="reg_si">SI (Source Index)</option>
+                        <option value="reg_di">DI (Destination Index)</option>
+                    </optgroup>
+                </select>
+                <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
+            </div>
+
+            <!-- Camera View Presets -->
+            <div class="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
+                <button id="view-diagram" title="2D Schematic (Fig 6.2 Authentic)" class="px-2.5 py-1 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 rounded transition-colors flex items-center gap-1.5 border border-slate-700">
+                    <i class="fa-solid fa-table-cells text-amber-400"></i> Diagram (2D)
+                </button>
+                <button id="view-default" title="3D Isometric Orbit View" class="px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors flex items-center gap-1.5">
+                    <i class="fa-solid fa-cube text-cyan-400"></i> 3D View
+                </button>
+                <button id="view-biu" title="Focus Bus Interface Unit" class="px-2 py-1 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors hidden sm:inline-flex">
+                    BIU
+                </button>
+                <button id="view-eu" title="Focus Execution Unit" class="px-2 py-1 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors hidden sm:inline-flex">
+                    EU
+                </button>
+                <button id="view-alu" title="Focus ALU & Flags" class="px-2 py-1 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors hidden md:inline-flex">
+                    ALU
+                </button>
+            </div>
+
+            <!-- Telemetry HUD Toggle Button in Header -->
+            <button id="btn-toggle-telemetry" class="px-2.5 py-1 text-xs font-medium text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/80 rounded-lg transition-colors border border-cyan-500/40 flex items-center gap-1.5 shadow-sm" title="Toggle Live Bus Flow Telemetry Window">
+                <i class="fa-solid fa-satellite-dish text-cyan-400"></i>
+                <span class="hidden sm:inline">Telemetry</span>
+            </button>
+
+            <!-- Help Modal Button -->
+            <button id="btn-guide" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-slate-800" title="Architecture Guide & Fig 6.2 Key">
+                <i class="fa-solid fa-book-bookmark text-sm"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 3D Canvas Mount Point -->
+    <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+    <!-- Floating Cursor Hover Tooltip -->
+    <div id="hover-tooltip" class="fixed opacity-0 transform -translate-x-1/2 -translate-y-full mb-3 pointer-events-none z-40 transition-all duration-100 ease-out">
+        <div class="px-3.5 py-1.5 rounded-lg bg-slate-900/95 border border-cyan-500/50 text-xs shadow-2xl backdrop-blur-md flex items-center space-x-2.5">
+            <span id="tooltip-dot" class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+            <div>
+                <span id="tooltip-text" class="font-mono text-cyan-200 font-bold tracking-wide">Component Name</span>
+                <span id="tooltip-sub" class="block text-[10px] text-slate-400 font-sans">Click to inspect & run live tools</span>
+            </div>
+        </div>
+    </div>
+    <!-- Bottom Floating Pipeline & Bus Simulation Dock -->
+    <div class="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 w-11/12 max-w-4xl glass-panel rounded-2xl p-3 shadow-2xl border border-slate-700/70">
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <!-- Pipeline Info / Step status -->
+            <div class="flex items-center space-x-3 w-full sm:w-auto">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-rose-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-timeline text-amber-400 text-sm"></i>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-semibold">8086 Pipeline Trace</span>
+                        <span id="sim-status-badge" class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">STANDBY</span>
+                    </div>
+                    <p id="sim-description" class="text-xs text-slate-300 font-medium truncate max-w-xs sm:max-w-md">
+                        Click Play or Step to trace data pulses through B-bus, C-Bus, and A-Bus
+                    </p>
+                </div>
+            </div>
+
+            <!-- Pipeline Progress Steps Indicators -->
+            <div class="flex items-center gap-1 py-1 px-2.5 bg-slate-900/90 rounded-xl border border-slate-800 text-[10px] sm:text-[11px] font-mono">
+                <div id="step-1" class="px-2 py-0.5 rounded transition-all bg-slate-800 text-slate-500">1. FETCH</div>
+                <i class="fa-solid fa-arrow-right text-[8px] text-slate-600"></i>
+                <div id="step-2" class="px-2 py-0.5 rounded transition-all bg-slate-800 text-slate-500">2. QUEUE</div>
+                <i class="fa-solid fa-arrow-right text-[8px] text-slate-600"></i>
+                <div id="step-3" class="px-2 py-0.5 rounded transition-all bg-slate-800 text-slate-500">3. DECODE</div>
+                <i class="fa-solid fa-arrow-right text-[8px] text-slate-600"></i>
+                <div id="step-4" class="px-2 py-0.5 rounded transition-all bg-slate-800 text-slate-500">4. EXECUTE</div>
+                <i class="fa-solid fa-arrow-right text-[8px] text-slate-600"></i>
+                <div id="step-5" class="px-2 py-0.5 rounded transition-all bg-slate-800 text-slate-500">5. WRITEBACK</div>
+            </div>
+
+            <!-- Simulation Action Buttons -->
+            <div class="flex items-center space-x-2 shrink-0">
+                <button id="sim-dock-telemetry-btn" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white transition-colors border border-slate-700" title="Toggle Live Telemetry HUD">
+                    <i class="fa-solid fa-satellite-dish text-xs"></i>
+                </button>
+                <button id="sim-play-btn" class="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 active:scale-95">
+                    <i class="fa-solid fa-play text-xs"></i> <span>Play</span>
+                </button>
+                <button id="sim-step-btn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors border border-slate-700 flex items-center gap-1 active:scale-95" title="Step forward 1 cycle">
+                    <i class="fa-solid fa-forward-step text-xs"></i> <span>Step</span>
+                </button>
+                <button id="sim-reset-btn" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors border border-slate-700" title="Reset Simulation">
+                    <i class="fa-solid fa-rotate-left text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Live Simulation Telemetry HUD Window -->
+    <div id="sim-telemetry-window" class="fixed top-16 left-4 z-30 w-[90vw] sm:w-[380px] max-w-sm glass-panel rounded-2xl p-4 shadow-2xl border border-cyan-500/30 text-xs backdrop-blur-xl transition-all duration-200">
+        <!-- Telemetry Window Header -->
+        <div class="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+            <div class="flex items-center space-x-2">
+                <span id="telem-pulse-dot" class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                </span>
+                <div>
+                    <h3 class="font-bold text-white text-xs tracking-wide flex items-center gap-1.5">
+                        <i class="fa-solid fa-satellite-dish text-cyan-400 text-[11px]"></i> Bus Telemetry HUD
+                    </h3>
+                    <div id="telem-header-status" class="text-[10px] text-slate-400 font-mono">STANDBY • Awaiting Cycle</div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-1">
+                <button id="telem-cam-toggle" class="p-1.5 rounded-lg bg-cyan-500 text-slate-950 hover:opacity-90 text-[11px] transition shadow-sm" title="Toggle Auto-Follow 3D Camera">
+                    <i class="fa-solid fa-video"></i>
+                </button>
+                <button id="telem-collapse-btn" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition border border-slate-700" title="Collapse / Expand Window">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+                <button id="telem-close-btn" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-[11px] transition border border-slate-700" title="Close Window">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Telemetry Body -->
+        <div id="telem-content-body" class="mt-3 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            <!-- Active Stage Banner -->
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                <div>
+                    <span class="text-[9px] uppercase font-mono tracking-wider text-slate-400 block">Current Phase</span>
+                    <span id="telem-step-badge" class="font-bold text-slate-300 text-xs">STANDBY</span>
+                </div>
+                <div class="text-right">
+                    <span id="telem-timing-state" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-800 text-cyan-300 font-semibold">T-State Idle</span>
+                </div>
+            </div>
+
+            <!-- Active Instruction -->
+            <div class="bg-slate-950/90 p-2.5 rounded-xl border border-slate-800">
+                <span class="text-[9px] uppercase font-mono text-slate-400 block mb-1">Target Instruction</span>
+                <code id="telem-instruction" class="text-amber-300 font-mono text-xs font-semibold">NOP (Idle)</code>
+            </div>
+
+            <!-- Signal Route (From -> To) -->
+            <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
+                <span class="text-[9px] uppercase font-mono text-slate-400 block">Data Path & Flow Route</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <!-- Origin -->
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800/80">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[9px] text-cyan-400 font-mono font-bold">FROM SOURCE</span>
+                            <span id="telem-from-unit" class="text-[8px] px-1 rounded bg-slate-800 text-slate-400 font-mono">--</span>
+                        </div>
+                        <div id="telem-from-name" class="font-bold text-white text-[11px] truncate">--</div>
+                        <div id="telem-from-detail" class="text-[10px] text-slate-400 truncate">No active source</div>
+                    </div>
+                    <!-- Target -->
+                    <div class="bg-slate-950 p-2 rounded-lg border border-slate-800/80">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[9px] text-rose-400 font-mono font-bold">TO DESTINATION</span>
+                            <span id="telem-to-unit" class="text-[8px] px-1 rounded bg-slate-800 text-slate-400 font-mono">--</span>
+                        </div>
+                        <div id="telem-to-name" class="font-bold text-white text-[11px] truncate">--</div>
+                        <div id="telem-to-detail" class="text-[10px] text-slate-400 truncate">No active destination</div>
+                    </div>
+                </div>
+                <!-- Conduit -->
+                <div class="pt-1 flex items-center gap-1.5 text-[10px] text-slate-300">
+                    <i class="fa-solid fa-route text-cyan-400 text-xs"></i>
+                    <span class="text-slate-400">Via:</span>
+                    <span id="telem-active-conduit" class="font-mono text-cyan-300 font-semibold truncate">Internal buses quiescent</span>
+                </div>
+            </div>
+
+            <!-- Physical Pins & Signals -->
+            <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800 space-y-1.5 font-mono text-[10px]">
+                <span class="text-[9px] uppercase tracking-wider text-slate-400 block font-sans">Bus Line Signals</span>
+                <div class="flex justify-between items-center text-slate-300">
+                    <span class="text-slate-400">Address (A19-A0):</span>
+                    <span id="telem-sig-addr" class="text-cyan-400 font-bold">00000 H</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-300">
+                    <span class="text-slate-400">Data Bus (D15-D0):</span>
+                    <span id="telem-sig-data" class="text-amber-400 font-bold">--</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-300">
+                    <span class="text-slate-400">Control Pins:</span>
+                    <span id="telem-sig-ctrl" class="text-emerald-400 font-bold truncate max-w-[190px]">ALE=0 • M/IO#=0</span>
+                </div>
+            </div>
+
+            <!-- Architectural Explanation -->
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                <span class="text-[9px] uppercase font-mono text-cyan-400 block mb-1 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-circle-info"></i> Pipeline Mechanism
+                </span>
+                <p id="telem-how-desc">
+                    The simulation is in standby. Press Play or Step to trace how addresses, opcodes, and operands transit through the 8086 internal buses.
+                </p>
+            </div>
+
+            <!-- Historical Activity Trace Log -->
+            <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                <span class="text-[9px] uppercase font-mono text-slate-400 block mb-1.5">Cycle Activity Log</span>
+                <div id="telem-trace-log" class="text-[10px] space-y-1 max-h-24 overflow-y-auto pr-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide-Over Inspection Drawer -->
+    <aside id="inspector-drawer" class="fixed top-0 right-0 bottom-0 z-40 w-full sm:w-[460px] glass-panel border-l border-slate-800 p-6 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out translate-x-full overflow-hidden">
+        <!-- Drawer Header -->
+        <div class="flex items-start justify-between pb-4 border-b border-slate-800/90 shrink-0">
+            <div>
+                <div class="flex items-center gap-2 mb-1.5">
+                    <span id="drawer-unit-badge" class="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                        BUS INTERFACE UNIT
+                    </span>
+                    <span id="drawer-tag" class="text-xs text-slate-400 font-mono">16-BIT REGISTER</span>
+                </div>
+                <h2 id="drawer-title" class="text-2xl font-black text-white tracking-tight">CS (Code Segment)</h2>
+                <h3 id="drawer-subtitle" class="text-xs font-mono text-cyan-400">Stores base paragraph of executable code</h3>
+            </div>
+            <button id="drawer-close-btn" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Drawer Scrollable Body -->
+        <div class="flex-1 overflow-y-auto py-5 space-y-6 pr-1">
+            <!-- Architectural Description -->
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-cyan-400"></i> Role & Function
+                </h4>
+                <p id="drawer-description" class="text-xs sm:text-sm text-slate-300 leading-relaxed bg-slate-900/70 p-3.5 rounded-xl border border-slate-800">
+                    The Code Segment register holds the upper 16-bits of the base memory address for the code currently being fetched.
+                </p>
+            </div>
+
+            <!-- Bus & Timing Specs Grid -->
+            <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800/80">
+                    <span class="text-slate-500 block text-[10px]">BUS CONNECTIONS</span>
+                    <span id="drawer-bus-conns" class="text-cyan-300 font-semibold">B-Bus, Dedicated Adder</span>
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800/80">
+                    <span class="text-slate-500 block text-[10px]">CLOCK CYCLES / WIDTH</span>
+                    <span id="drawer-specs" class="text-amber-300 font-semibold">16-bit register / 4 clock T-states</span>
+                </div>
+            </div>
+
+            <!-- Assembly Instruction Context -->
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-code text-amber-400"></i> Assembly Application
+                </h4>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 overflow-x-auto">
+                    <code id="drawer-asm-example" class="text-cyan-300">MOV AX, CS ; Copy code segment to AX</code>
+                </div>
+            </div>
+
+            <!-- DYNAMIC INTERACTIVE CALCULATORS & TOOLS -->
+            <div id="interactive-tool-container" class="pt-2 border-t border-slate-800/80">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-rose-400"></i> Interactive Tool
+                    </h4>
+                    <span class="text-[10px] text-cyan-400 font-mono bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800">Live Simulator</span>
+                </div>
+
+                <!-- 1. 20-bit Physical Address Calculator -->
+                <div id="tool-address-calc" class="hidden space-y-3 bg-slate-900/70 p-4 rounded-xl border border-sky-500/20">
+                    <p class="text-xs text-slate-300 leading-normal">
+                        8086 generates a 20-bit physical address using <span class="font-mono text-cyan-300 font-bold">(Segment × 10H) + Offset</span>:
+                    </p>
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">Segment (Hex):</label>
+                            <input type="text" id="calc-segment" maxlength="4" value="2000" class="w-full bg-slate-950 border border-slate-700 px-2.5 py-1.5 rounded text-cyan-300 focus:outline-none focus:border-cyan-400 text-center uppercase font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">Offset (Hex):</label>
+                            <input type="text" id="calc-offset" maxlength="4" value="0100" class="w-full bg-slate-950 border border-slate-700 px-2.5 py-1.5 rounded text-amber-300 focus:outline-none focus:border-amber-400 text-center uppercase font-bold">
+                        </div>
+                    </div>
+                    <div class="p-3 bg-slate-950/90 rounded-lg border border-slate-800 font-mono text-xs space-y-1">
+                        <div class="flex justify-between text-slate-400 text-[11px]">
+                            <span>Segment Base (Shifted 4 bits):</span>
+                            <span id="calc-shifted" class="text-cyan-400">20000 H</span>
+                        </div>
+                        <div class="flex justify-between text-slate-400 text-[11px]">
+                            <span>+ Effective Offset:</span>
+                            <span id="calc-offset-disp" class="text-amber-400">00100 H</span>
+                        </div>
+                        <div class="h-px bg-slate-800 my-1"></div>
+                        <div class="flex justify-between font-bold text-sm">
+                            <span class="text-white">20-bit Physical Address:</span>
+                            <span id="calc-result" class="text-emerald-400 font-black">20100 H</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Interactive Flag Register Inspector -->
+                <div id="tool-flags-inspector" class="hidden space-y-3 bg-slate-900/70 p-4 rounded-xl border border-rose-500/20">
+                    <p class="text-xs text-slate-300">
+                        Click bits to toggle status flags and see how 8086 condition evaluation responds:
+                    </p>
+                    <div class="grid grid-cols-3 gap-1.5 font-mono text-center">
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="OF">
+                            <div class="text-[10px] text-slate-400">OF (Overflow)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">0</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="DF">
+                            <div class="text-[10px] text-slate-400">DF (Direction)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">0</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="IF">
+                            <div class="text-[10px] text-slate-400">IF (Interrupt)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">1</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="TF">
+                            <div class="text-[10px] text-slate-400">TF (Trap)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">0</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="SF">
+                            <div class="text-[10px] text-slate-400">SF (Sign)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">0</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="ZF">
+                            <div class="text-[10px] text-slate-400">ZF (Zero)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">1</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="AF">
+                            <div class="text-[10px] text-slate-400">AF (Aux Carry)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">0</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="PF">
+                            <div class="text-[10px] text-slate-400">PF (Parity)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">1</div>
+                        </button>
+                        <button class="flag-bit-btn p-2 rounded bg-slate-800 border border-slate-700 hover:border-rose-400 transition" data-flag="CF">
+                            <div class="text-[10px] text-slate-400">CF (Carry)</div>
+                            <div class="text-sm font-bold text-rose-400 flag-val">0</div>
+                        </button>
+                    </div>
+                    <div id="flag-explanation" class="text-[11px] font-mono text-slate-300 p-2.5 rounded bg-slate-950 border border-slate-800">
+                        ZF = 1 indicates previous arithmetic or logical operation returned exactly 0.
+                    </div>
+                </div>
+
+                <!-- 3. FIFO Queue Simulator -->
+                <div id="tool-queue-simulator" class="hidden space-y-3 bg-slate-900/70 p-4 rounded-xl border border-amber-500/20">
+                    <p class="text-xs text-slate-300">
+                        The 8086 holds up to 6 prefetch opcode bytes in its FIFO queue (Slot 6 at top, Slot 1 at head):
+                    </p>
+                    <div class="flex items-center justify-between gap-1 py-2 font-mono text-xs">
+                        <div class="flex-1 text-center p-1.5 rounded bg-slate-800 border border-slate-700 queue-slot" data-slot="6">
+                            <span class="block text-[9px] text-slate-400">6 (Top)</span>
+                            <span class="font-bold text-amber-300 slot-byte">8B</span>
+                        </div>
+                        <div class="flex-1 text-center p-1.5 rounded bg-slate-800 border border-slate-700 queue-slot" data-slot="5">
+                            <span class="block text-[9px] text-slate-400">5</span>
+                            <span class="font-bold text-amber-300 slot-byte">C3</span>
+                        </div>
+                        <div class="flex-1 text-center p-1.5 rounded bg-slate-800 border border-slate-700 queue-slot" data-slot="4">
+                            <span class="block text-[9px] text-slate-400">4</span>
+                            <span class="font-bold text-amber-300 slot-byte">03</span>
+                        </div>
+                        <div class="flex-1 text-center p-1.5 rounded bg-slate-800 border border-slate-700 queue-slot" data-slot="3">
+                            <span class="block text-[9px] text-slate-400">3</span>
+                            <span class="font-bold text-amber-300 slot-byte">D8</span>
+                        </div>
+                        <div class="flex-1 text-center p-1.5 rounded bg-slate-800 border border-slate-700 queue-slot" data-slot="2">
+                            <span class="block text-[9px] text-slate-400">2</span>
+                            <span class="font-bold text-amber-300 slot-byte">E9</span>
+                        </div>
+                        <div class="flex-1 text-center p-1.5 rounded bg-amber-950/80 border border-amber-500 queue-slot shadow-sm shadow-amber-500/20" data-slot="1">
+                            <span class="block text-[9px] text-amber-300 font-bold">1 (Head)</span>
+                            <span class="font-bold text-amber-300 slot-byte">90</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btn-queue-push" class="flex-1 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-semibold rounded text-xs transition">
+                            <i class="fa-solid fa-arrow-down mr-1"></i> BIU Prefetch (Push)
+                        </button>
+                        <button id="btn-queue-pop" class="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold rounded text-xs transition">
+                            <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> EU Decode (Pop)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4. 16-bit ALU Simulator -->
+                <div id="tool-alu-simulator" class="hidden space-y-3 bg-slate-900/70 p-4 rounded-xl border border-rose-500/20">
+                    <p class="text-xs text-slate-300">
+                        Run 16-bit binary operations on operands A & B with automatic flag updates:
+                    </p>
+                    <div class="grid grid-cols-3 gap-2 font-mono text-xs">
+                        <div class="col-span-1">
+                            <label class="block text-[10px] text-slate-400 mb-1">Operand A:</label>
+                            <input type="text" id="alu-input-a" maxlength="4" value="001F" class="w-full bg-slate-950 border border-slate-700 px-2 py-1 rounded text-cyan-300 uppercase text-center font-bold">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-[10px] text-slate-400 mb-1">Operation:</label>
+                            <select id="alu-op-select" class="w-full bg-slate-950 border border-slate-700 px-2 py-1 rounded text-rose-300 font-bold text-center">
+                                <option value="ADD">ADD (+)</option>
+                                <option value="SUB">SUB (-)</option>
+                                <option value="AND">AND (&)</option>
+                                <option value="OR">OR (|)</option>
+                                <option value="XOR">XOR (^)</option>
+                            </select>
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-[10px] text-slate-400 mb-1">Operand B:</label>
+                            <input type="text" id="alu-input-b" maxlength="4" value="0001" class="w-full bg-slate-950 border border-slate-700 px-2 py-1 rounded text-amber-300 uppercase text-center font-bold">
+                        </div>
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 font-mono text-xs flex justify-between items-center">
+                        <span class="text-slate-400">ALU Output:</span>
+                        <span id="alu-calc-result" class="text-emerald-400 font-bold text-sm">0020 H</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-400 flex justify-between px-1">
+                        <span>Zero: <strong id="alu-zf" class="text-slate-200">0</strong></span>
+                        <span>Sign: <strong id="alu-sf" class="text-slate-200">0</strong></span>
+                        <span>Carry: <strong id="alu-cf" class="text-slate-200">0</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drawer Footer -->
+        <div class="pt-4 border-t border-slate-800/90 shrink-0">
+            <button id="drawer-focus-3d-btn" class="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium rounded-xl text-xs transition-all shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-crosshairs"></i> Center Camera On Component
+            </button>
+        </div>
+    </aside>
+
+    <!-- Help & Fig 6.2 Key Modal -->
+    <div id="guide-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="max-w-2xl w-full glass-panel rounded-2xl p-6 border border-slate-700 shadow-2xl relative">
+            <button id="guide-modal-close" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-book-open text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-white">8086 Internal Architecture Key (Fig. 6.2)</h3>
+                    <p class="text-xs text-slate-400">Official Intel dual-unit pipeline mapping</p>
+                </div>
+            </div>
+            <div class="space-y-4 text-xs text-slate-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+                <p>
+                    The 8086 features two decoupled units operating simultaneously: the 
+                    <strong class="text-sky-400">Bus Interface Unit (BIU)</strong> and the <strong class="text-rose-400">Execution Unit (EU)</strong>.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div class="p-3 rounded-xl bg-sky-950/50 border border-sky-500/30">
+                        <h4 class="font-bold text-sky-400 font-mono mb-1">BIU (Top Half)</h4>
+                        <ul class="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                            <li><strong>Memory Interface:</strong> Generates bus cycles for memory/IO</li>
+                            <li><strong>Σ Adder:</strong> Sums (Segment × 16) + Offset</li>
+                            <li><strong>Segment Registers:</strong> ES, CS, SS, DS, and IP</li>
+                            <li><strong>6-Byte Queue:</strong> Prefetches opcode bytes via C-Bus</li>
+                            <li><strong>B-Bus:</strong> Feeds segment base addresses to Σ adder</li>
+                        </ul>
+                    </div>
+                    <div class="p-3 rounded-xl bg-rose-950/50 border border-rose-500/30">
+                        <h4 class="font-bold text-rose-400 font-mono mb-1">EU (Bottom Half)</h4>
+                        <ul class="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                            <li><strong>Control System:</strong> Decodes opcode from Queue byte 1</li>
+                            <li><strong>A-Bus:</strong> Main 16-bit communication highway</li>
+                            <li><strong>16-bit ALU:</strong> Executes arithmetic and boolean logic</li>
+                            <li><strong>Operands / Flags:</strong> Stores 9 condition status flags</li>
+                            <li><strong>EU Registers:</strong> AX, BX, CX, DX, SP, BP, SI, DI</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                    <h5 class="font-bold text-amber-300 mb-1">Accurate Bus Arrows Legend</h5>
+                    <p class="text-[11px] space-y-1">
+                        • <strong>B-bus:</strong> Upward arrow to left input of Σ adder.<br>
+                        • <strong>C-Bus:</strong> Horizontal line across top, turning down with arrow into Queue Byte 6.<br>
+                        • <strong>Queue to Control System:</strong> Downward arrow into decoder.<br>
+                        • <strong>A-Bus to ALU:</strong> Two downward arrows into left and right ALU operands.<br>
+                        • <strong>ALU to A-Bus:</strong> Output arrow turning right into the vertical trunk of A-Bus.<br>
+                        • <strong>Bidirectional (↕):</strong> Double-headed arrows between IP & A-Bus, EU registers & A-Bus, and Flags & A-Bus.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const ARCHITECTURE_DATA = {
+            mem_interface: {
+                id: 'mem_interface',
+                name: 'Memory Interface',
+                subtitle: 'External Bus Controller & Transceivers',
+                group: 'Bus Interface Unit (BIU)',
+                unit: 'BIU',
+                desc: 'Controls physical interfacing to system memory and I/O devices via the multiplexed address/data bus (AD0-AD15) and bus status signals. Connects directly to the Σ dedicated adder and feeds the instruction stream byte queue via C-Bus.',
+                busConns: 'B-Bus, C-Bus, External System Bus',
+                specs: '20-bit Address / 16-bit Data Bus',
+                asm: '; Triggers external read cycle via Memory Interface:\nMOV AL, [0300H] ; Read byte from memory into AL',
+                tool: 'calc'
+            },
+            adder: {
+                id: 'adder',
+                name: 'Σ Dedicated Adder',
+                subtitle: '20-bit Physical Address Generator',
+                group: 'Bus Interface Unit (BIU)',
+                unit: 'BIU',
+                desc: 'A dedicated hardware summing unit in the BIU that shifts the 16-bit segment register left by 4 bits (multiplying by 16) and adds the 16-bit offset from IP or EU registers to generate the 20-bit physical memory address.',
+                busConns: 'B-Bus, Segment Registers, Memory Interface',
+                specs: '20-bit Adder / 1 MB Addressing Range',
+                asm: '; Physical Address = (CS * 16) + IP\n; Example: CS=2000H, IP=0100H -> 20100H',
+                tool: 'calc'
+            },
+            reg_es: {
+                id: 'reg_es',
+                name: 'ES (Extra Segment)',
+                subtitle: '16-bit Extra Segment Register',
+                group: 'BIU Segment Registers',
+                unit: 'BIU',
+                desc: 'Holds base paragraph address for extra data. Mandatory segment for destination strings referenced by ES:DI during string manipulation instructions (MOVS, STOS, CMPS).',
+                busConns: 'B-Bus, Dedicated Adder',
+                specs: '16-bit register / Segment base',
+                asm: 'CLD           ; Forward string scan\nREP MOVSB     ; Copy memory from DS:SI to ES:DI',
+                tool: 'calc'
+            },
+            reg_cs: {
+                id: 'reg_cs',
+                name: 'CS (Code Segment)',
+                subtitle: '16-bit Code Segment Register',
+                group: 'BIU Segment Registers',
+                unit: 'BIU',
+                desc: 'Points to current 64KB code segment where machine instructions reside. Paired with the Instruction Pointer (CS:IP) by the Σ adder to fetch instructions into the prefetch queue.',
+                busConns: 'B-Bus, Dedicated Adder',
+                specs: '16-bit register / Code base',
+                asm: '; Direct assignment to CS is illegal\nJMP 2000H:0100H ; Far jump updates CS and IP simultaneously',
+                tool: 'calc'
+            },
+            reg_ss: {
+                id: 'reg_ss',
+                name: 'SS (Stack Segment)',
+                subtitle: '16-bit Stack Segment Register',
+                group: 'BIU Segment Registers',
+                unit: 'BIU',
+                desc: 'Points to current 64KB stack segment. Combined with SP (Stack Pointer) or BP (Base Pointer) to calculate physical memory addresses during PUSH, POP, CALL, and RET.',
+                busConns: 'B-Bus, Dedicated Adder',
+                specs: '16-bit register / Stack base',
+                asm: 'PUSH AX       ; Decrements SP by 2, saves AX at SS:SP\nPOP BX        ; Retrieves word from SS:SP into BX',
+                tool: 'calc'
+            },
+            reg_ds: {
+                id: 'reg_ds',
+                name: 'DS (Data Segment)',
+                subtitle: '16-bit Data Segment Register',
+                group: 'BIU Segment Registers',
+                unit: 'BIU',
+                desc: 'Points to default 64KB data segment where program variables and operands reside. Default segment for operands referenced via BX, SI, DI, or direct memory addresses.',
+                busConns: 'B-Bus, Dedicated Adder',
+                specs: '16-bit register / Data base',
+                asm: 'MOV AX, @DATA\nMOV DS, AX   ; Initialize Data Segment base address',
+                tool: 'calc'
+            },
+            reg_ip: {
+                id: 'reg_ip',
+                name: 'IP (Instruction Pointer)',
+                subtitle: '16-bit Offset / Program Counter',
+                group: 'BIU Segment Registers',
+                unit: 'BIU',
+                desc: 'Holds the 16-bit offset of the next instruction byte to be fetched from the Code Segment. Automatically incremented as instructions are loaded into the FIFO prefetch queue. Connects to EU A-Bus via bidirectional link.',
+                busConns: 'B-Bus, Σ Adder, EU A-Bus (Bidirectional)',
+                specs: '16-bit register / Auto-incrementing',
+                asm: 'CALL SUBROUTINE ; Pushes return IP, jumps to target offset',
+                tool: 'calc'
+            },
+            queue: {
+                id: 'queue',
+                name: 'Instruction Stream Byte Queue',
+                subtitle: '6-Byte FIFO Instruction Prefetch Buffer',
+                group: 'Bus Interface Unit (BIU)',
+                unit: 'BIU',
+                desc: 'A 6-byte First-In-First-Out (FIFO) queue. While the Execution Unit is busy decoding and computing, the BIU utilizes idle bus cycles to prefetch up to 6 bytes of upcoming instructions via C-Bus, achieving instruction pipelining.',
+                busConns: 'C-Bus (Input at Byte 6), Control System (Output from Byte 1)',
+                specs: '6 Bytes FIFO Capacity / Auto-Prefetch',
+                asm: '; Prefetched in background during execution:\nADD AX, BX    ; EU computes while BIU prefetches next bytes',
+                tool: 'queue'
+            },
+            control: {
+                id: 'control',
+                name: 'Control System',
+                subtitle: 'Instruction Decoder & Bus State Machine',
+                group: 'Execution Unit (EU)',
+                unit: 'EU',
+                desc: 'Fetches opcode bytes from Queue Byte 1 (head), decodes their bit patterns into microcode control sequences, and coordinates execution by broadcasting control pulses across the internal A-Bus.',
+                busConns: 'Queue Head (Byte 1), EU A-Bus',
+                specs: 'Microcode Decoder / Multi-cycle State Machine',
+                asm: '; Decoded into multi-cycle microcode:\nIMUL BX       ; Control system orchestrates 16-bit multiplication',
+                tool: 'none'
+            },
+            alu: {
+                id: 'alu',
+                name: 'Arithmetic Logic Unit (ALU)',
+                subtitle: '16-Bit Computational Engine',
+                group: 'Execution Unit (EU)',
+                unit: 'EU',
+                desc: 'The iconic 16-bit chevron processing unit. Receives two operands from the A-Bus, executes arithmetic operations (ADD, SUB, MUL, DIV) and boolean operations (AND, OR, XOR, NOT), and updates status flags directly.',
+                busConns: 'A-Bus (2 Operand Inputs), Operands/Flags, A-Bus Return',
+                specs: '16-bit Datapath / High-speed Lookahead Carry',
+                asm: 'ADD AX, [BX+SI+4] ; ALU adds memory value to AX, updates flags',
+                tool: 'alu'
+            },
+            flags: {
+                id: 'flags',
+                name: 'Operands / Flags',
+                subtitle: '16-bit Status and Machine Control Register',
+                group: 'Execution Unit (EU)',
+                unit: 'EU',
+                desc: 'Contains 9 active flags: 6 Status Flags (CF, PF, AF, ZF, SF, OF) set dynamically by the ALU based on operation outcomes, and 3 Control Flags (TF, IF, DF) set by software instructions to govern CPU behavior.',
+                busConns: 'ALU Status Lines, EU A-Bus (Bidirectional)',
+                specs: '16-bit Register (9 active flags, 7 reserved)',
+                asm: 'CMP AX, 0     ; If AX is zero, ALU sets ZF = 1\nJE TARGET     ; Jump if Equal branches when ZF == 1',
+                tool: 'flags'
+            },
+            reg_ax: {
+                id: 'reg_ax',
+                name: 'AH | AL (Accumulator AX)',
+                subtitle: '16-bit Primary Accumulator Register',
+                group: 'EU General Registers',
+                unit: 'EU',
+                desc: 'The primary general-purpose accumulator, split into 8-bit halves AH and AL. Favored for optimized arithmetic, bitwise logic, I/O operations (IN/OUT), and mandatory for multiply/divide operations.',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit (Split into 8-bit AH / AL)',
+                asm: 'IN AL, 60H    ; Read byte from keyboard port into AL',
+                tool: 'none'
+            },
+            reg_bx: {
+                id: 'reg_bx',
+                name: 'BH | BL (Base BX)',
+                subtitle: '16-bit Base Register',
+                group: 'EU General Registers',
+                unit: 'EU',
+                desc: 'General purpose register uniquely capable of serving as a base pointer for memory indirect addressing modes (e.g. [BX + offset]).',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit (Split into 8-bit BH / BL)',
+                asm: 'MOV AL, [BX]  ; Read byte from memory pointed to by DS:BX',
+                tool: 'none'
+            },
+            reg_cx: {
+                id: 'reg_cx',
+                name: 'CH | CL (Count CX)',
+                subtitle: '16-bit Count Register',
+                group: 'EU General Registers',
+                unit: 'EU',
+                desc: 'Specialized counter for loops (LOOP, JCXZ), string repeat prefixes (REP, REPE), and bit shifts/rotations where CL holds the shift count.',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit (Split into 8-bit CH / CL)',
+                asm: 'MOV CX, 10    ; Set loop iterations\nL1: LOOP L1   ; Decrements CX until 0',
+                tool: 'none'
+            },
+            reg_dx: {
+                id: 'reg_dx',
+                name: 'DH | DL (Data DX)',
+                subtitle: '16-bit Data Register',
+                group: 'EU General Registers',
+                unit: 'EU',
+                desc: 'Participates in 32-bit operations as the high-word companion to AX (DX:AX pair) during multiply/divide, and holds 16-bit I/O port addresses for DX-indirect I/O.',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit (Split into 8-bit DH / DL)',
+                asm: 'MUL BX        ; Multiplies AX * BX -> 32-bit product in DX:AX',
+                tool: 'none'
+            },
+            reg_sp: {
+                id: 'reg_sp',
+                name: 'SP (Stack Pointer)',
+                subtitle: '16-bit Stack Offset Pointer',
+                group: 'EU Pointer Registers',
+                unit: 'EU',
+                desc: 'Points to current top-of-stack offset inside the Stack Segment (SS:SP). Automatically decremented on PUSH and CALL, incremented on POP and RET.',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit offset into Stack Segment (SS:SP)',
+                asm: 'MOV BP, SP    ; Set up stack frame base pointer',
+                tool: 'none'
+            },
+            reg_bp: {
+                id: 'reg_bp',
+                name: 'BP (Base Pointer)',
+                subtitle: '16-bit Stack Base Pointer',
+                group: 'EU Pointer Registers',
+                unit: 'EU',
+                desc: 'Primary mechanism for accessing function parameters and local variables on the stack frame. By default addresses relative to Stack Segment (SS:BP).',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit offset into Stack Segment (SS:BP)',
+                asm: 'MOV AX, [BP+4]; Access parameter pushed onto stack prior to CALL',
+                tool: 'none'
+            },
+            reg_si: {
+                id: 'reg_si',
+                name: 'SI (Source Index)',
+                subtitle: '16-bit Source Index Register',
+                group: 'EU Index Registers',
+                unit: 'EU',
+                desc: 'Holds the memory offset of source data relative to DS. Crucial for string copy, compare, and indexed array operations.',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit index register (DS:SI default)',
+                asm: 'LODSB         ; Load byte from DS:SI into AL and increment SI',
+                tool: 'none'
+            },
+            reg_di: {
+                id: 'reg_di',
+                name: 'DI (Destination Index)',
+                subtitle: '16-bit Destination Index Register',
+                group: 'EU Index Registers',
+                unit: 'EU',
+                desc: 'Holds the memory offset for destination operands. In string instructions, it is strictly bound to the Extra Segment (ES:DI).',
+                busConns: 'EU A-Bus (Bidirectional)',
+                specs: '16-bit index register (ES:DI default for strings)',
+                asm: 'STOSB         ; Store byte from AL to ES:DI and advance DI',
+                tool: 'none'
+            }
+        };
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020617, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 31);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.minDistance = 6;
+        controls.maxDistance = 65;
+        controls.target.set(0, -0.4, 0);
+
+        // Lighting Rig
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        scene.add(ambientLight);
+
+        const mainDirLight = new THREE.DirectionalLight(0xf0f9ff, 1.1);
+        mainDirLight.position.set(12, 22, 22);
+        mainDirLight.castShadow = true;
+        mainDirLight.shadow.mapSize.width = 2048;
+        mainDirLight.shadow.mapSize.height = 2048;
+        scene.add(mainDirLight);
+
+        const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.5);
+        fillLight.position.set(-15, 8, 10);
+        scene.add(fillLight);
+
+        const warmLight = new THREE.PointLight(0xf43f5e, 0.7, 30);
+        warmLight.position.set(4, -8, 8);
+        scene.add(warmLight);
+
+        const gridHelper = new THREE.GridHelper(80, 80, 0x1e293b, 0x0f172a);
+        gridHelper.position.y = -14;
+        scene.add(gridHelper);
+
+        const rootArchitectureGroup = new THREE.Group();
+        scene.add(rootArchitectureGroup);
+
+        const interactiveMeshes = [];
+        const meshLookup = {};
+
+        /**
+         * Generates ultra-crisp, high-resolution textures with anisotropic filtering.
+         * Eliminates blurriness by rendering at 2K resolution with subpixel font smoothing.
+         */
+        function createSharpCanvasTexture(width, height, drawCallback) {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(Number(width) || 1024, 64);
+            canvas.height = Math.max(Number(height) || 512, 64);
+            const ctx = canvas.getContext('2d', { alpha: true });
+            if (!ctx) return new THREE.Texture();
+
+            // Maximize text rendering quality
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            if (typeof drawCallback === 'function') {
+                try {
+                    drawCallback(ctx, canvas.width, canvas.height);
+                } catch (err) {
+                    console.error('Canvas texture draw error:', err);
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const anisotropyVal = (renderer && renderer.capabilities && typeof renderer.capabilities.getMaxAnisotropy === 'function')
+                ? renderer.capabilities.getMaxAnisotropy()
+                : 1;
+            texture.anisotropy = anisotropyVal || 1;
+            texture.generateMipmaps = true;
+            texture.minFilter = THREE.LinearMipmapLinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.needsUpdate = true;
+            return texture;
+        }
+
+        // Texture generator for standard register / functional blocks
+        function createBlockFrontTexture(mainText, subText, options = {}) {
+            const {
+                width = 2048,
+                height = 512,
+                bgColor = '#091528',
+                accentColor = '#38bdf8',
+                textColor = '#ffffff',
+                subColor = '#94a3b8',
+                splitDual = false,
+                dualLeft = '',
+                dualRight = '',
+                centerSymbol = ''
+            } = options;
+
+            return createSharpCanvasTexture(width, height, (ctx, w, h) => {
+                const cw = Number(w) || 2048;
+                const ch = Number(h) || 512;
+
+                // 1. Background fill (strictly 4 numeric arguments: x, y, width, height)
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, cw, ch);
+
+                // 2. High-tech subtle grid pattern (strictly 4 numeric arguments)
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+                for (let y = 0; y < ch; y += 16) {
+                    ctx.fillRect(0, y, cw, 2);
+                }
+
+                // 3. Glowing border
+                ctx.lineWidth = 14;
+                ctx.strokeStyle = accentColor;
+                ctx.strokeRect(7, 7, Math.max(cw - 14, 1), Math.max(ch - 14, 1));
+
+                // 4. Corner decorative brackets (strictly 4 numeric arguments)
+                ctx.fillStyle = accentColor;
+                const bracketSz = 28;
+                ctx.fillRect(7, 7, bracketSz, bracketSz);
+                ctx.fillRect(Math.max(cw - 7 - bracketSz, 0), 7, bracketSz, bracketSz);
+                ctx.fillRect(7, Math.max(ch - 7 - bracketSz, 0), bracketSz, bracketSz);
+                ctx.fillRect(Math.max(cw - 7 - bracketSz, 0), Math.max(ch - 7 - bracketSz, 0), bracketSz, bracketSz);
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                if (splitDual) {
+                    // Vertical divider in the exact middle for AH | AL registers
+                    ctx.lineWidth = 8;
+                    ctx.strokeStyle = accentColor;
+                    ctx.beginPath();
+                    ctx.moveTo(cw / 2, 14);
+                    ctx.lineTo(cw / 2, ch - 14);
+                    ctx.stroke();
+
+                    // Left register half (e.g. AH)
+                    ctx.fillStyle = textColor;
+                    ctx.font = 'bold 120px "Fira Code", monospace';
+                    ctx.shadowColor = accentColor;
+                    ctx.shadowBlur = 18;
+                    ctx.fillText(dualLeft, cw * 0.25, ch * 0.44);
+
+                    // Right register half (e.g. AL)
+                    ctx.fillText(dualRight, cw * 0.75, ch * 0.44);
+
+                    // Subtitle under halves
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = subColor;
+                    ctx.font = 'bold 36px "Inter", sans-serif';
+                    ctx.fillText('HIGH BYTE', cw * 0.25, ch * 0.78);
+                    ctx.fillText('LOW BYTE', cw * 0.75, ch * 0.78);
+                } else {
+                    // Standard single block
+                    if (centerSymbol) {
+                        ctx.fillStyle = accentColor;
+                        ctx.font = '900 130px "Inter", sans-serif';
+                        ctx.shadowColor = accentColor;
+                        ctx.shadowBlur = 24;
+                        ctx.fillText(centerSymbol, cw / 2, ch * 0.38);
+
+                        ctx.shadowBlur = 0;
+                        ctx.fillStyle = textColor;
+                        ctx.font = 'bold 64px "Fira Code", monospace';
+                        ctx.fillText(mainText, cw / 2, ch * 0.72);
+                    } else {
+                        ctx.fillStyle = textColor;
+                        ctx.font = 'bold 110px "Fira Code", monospace';
+                        ctx.shadowColor = accentColor;
+                        ctx.shadowBlur = 18;
+                        const yMain = subText ? (ch * 0.42) : (ch * 0.5);
+                        ctx.fillText(mainText, cw / 2, yMain);
+
+                        if (subText) {
+                            ctx.shadowBlur = 0;
+                            ctx.fillStyle = subColor;
+                            ctx.font = 'bold 42px "Inter", sans-serif';
+                            ctx.fillText(subText, cw / 2, ch * 0.78);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Helper to construct a multi-material 3D box with sharp front face
+        function createSharpBoxMesh(width, height, depth, frontTexture, baseColor = 0x0f172a, edgeColor = 0x38bdf8) {
+            const geo = new THREE.BoxGeometry(width, height, depth);
+            const sideMat = new THREE.MeshStandardMaterial({
+                color: baseColor,
+                roughness: 0.35,
+                metalness: 0.2,
+                emissive: baseColor,
+                emissiveIntensity: 0.15
+            });
+            const frontMat = new THREE.MeshStandardMaterial({
+                map: frontTexture,
+                roughness: 0.2,
+                metalness: 0.1,
+                emissive: 0xffffff,
+                emissiveMap: frontTexture,
+                emissiveIntensity: 0.25
+            });
+
+            // [right, left, top, bottom, front (+z), back (-z)]
+            const materials = [sideMat, sideMat, sideMat, sideMat, frontMat, sideMat];
+            const mesh = new THREE.Mesh(geo, materials);
+
+            // Wireframe accent border
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.8 }));
+            mesh.add(line);
+
+            return mesh;
+        }
+
+        function registerBlock(mesh, compId, edgesColor = 0x38bdf8) {
+            mesh.userData = { id: compId, data: ARCHITECTURE_DATA[compId] };
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            interactiveMeshes.push(mesh);
+            meshLookup[compId] = mesh;
+            rootArchitectureGroup.add(mesh);
+            return mesh;
+        }
+        // 1. Memory Interface (Pill/capsule block at top left)
+        const memTex = createBlockFrontTexture('Memory Interface', 'External Bus Interfacing • AD0-AD15', {
+            bgColor: '#033454',
+            accentColor: '#38bdf8',
+            textColor: '#f0f9ff',
+            subColor: '#bae6fd'
+        });
+        const memMesh = createSharpBoxMesh(5.6, 1.4, 1.4, memTex, 0x032d4a, 0x38bdf8);
+        memMesh.position.set(-4.0, 9.8, 0);
+        registerBlock(memMesh, 'mem_interface', 0x38bdf8);
+
+        // 2. Σ Dedicated 20-bit Address Adder (Inverted Trapezoid)
+        const adderTex = createBlockFrontTexture('Σ ADDER', '20-bit Dedicated Address Bus Summing Unit', {
+            width: 1024,
+            height: 512,
+            bgColor: '#034433',
+            accentColor: '#34d399',
+            textColor: '#ecfdf5',
+            subColor: '#a7f3d0',
+            centerSymbol: 'Σ'
+        });
+        const adderShape = new THREE.Shape();
+        adderShape.moveTo(-2.5, 0.9);
+        adderShape.lineTo(2.5, 0.9);
+        adderShape.lineTo(1.4, -0.9);
+        adderShape.lineTo(-1.4, -0.9);
+        adderShape.closePath();
+
+        const adderExtrude = { depth: 1.4, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.06, bevelThickness: 0.06 };
+        const adderGeo = new THREE.ExtrudeGeometry(adderShape, adderExtrude);
+        adderGeo.center();
+
+        const adderMat = new THREE.MeshStandardMaterial({
+            map: adderTex,
+            roughness: 0.25,
+            metalness: 0.2,
+            emissive: 0x059669,
+            emissiveIntensity: 0.15
+        });
+        const adderMesh = new THREE.Mesh(adderGeo, adderMat);
+        adderMesh.position.set(-4.0, 7.1, 0);
+
+        const adderEdges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(adderGeo),
+            new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85 })
+        );
+        adderMesh.add(adderEdges);
+        registerBlock(adderMesh, 'adder', 0x34d399);
+
+        // 3. BIU Segment Registers & IP Stack (ES, CS, SS, DS, IP)
+        const biuRegisters = [
+            { id: 'reg_es', name: 'ES', sub: 'Extra Segment', y: 4.8 },
+            { id: 'reg_cs', name: 'CS', sub: 'Code Segment', y: 3.8 },
+            { id: 'reg_ss', name: 'SS', sub: 'Stack Segment', y: 2.8 },
+            { id: 'reg_ds', name: 'DS', sub: 'Data Segment', y: 1.8 },
+            { id: 'reg_ip', name: 'IP', sub: 'Instruction Pointer', y: 0.8 }
+        ];
+
+        biuRegisters.forEach(reg => {
+            const regTex = createBlockFrontTexture(reg.name, reg.sub, {
+                bgColor: '#082f49',
+                accentColor: '#38bdf8',
+                textColor: '#ffffff',
+                subColor: '#7dd3fc'
+            });
+            const regMesh = createSharpBoxMesh(4.6, 0.95, 1.4, regTex, 0x07283d, 0x38bdf8);
+            regMesh.position.set(-4.0, reg.y, 0);
+            registerBlock(regMesh, reg.id, 0x38bdf8);
+        });
+
+        // 4. Instruction Stream Byte Queue (Slots 6 down to 1)
+        const queueGroup = new THREE.Group();
+        queueGroup.position.set(4.0, 5.2, 0);
+        rootArchitectureGroup.add(queueGroup);
+
+        const queueSlotMeshes = [];
+        for (let i = 6; i >= 1; i--) {
+            const yOffset = (i - 3.5) * 0.85;
+            const isHead = (i === 1);
+            const slotTex = createBlockFrontTexture(
+                `Byte ${i}`,
+                isHead ? 'FIFO HEAD -> EU' : 'PREFETCH BYTE',
+                {
+                    width: 1024,
+                    height: 256,
+                    bgColor: isHead ? '#582404' : '#391702',
+                    accentColor: isHead ? '#fbbf24' : '#f59e0b',
+                    textColor: '#fffbeb',
+                    subColor: isHead ? '#fef08a' : '#fcd34d'
+                }
+            );
+            const slotMesh = createSharpBoxMesh(
+                3.4, 0.78, 1.4,
+                slotTex,
+                isHead ? 0x451a03 : 0x270f02,
+                isHead ? 0xfbbf24 : 0xd97706
+            );
+            slotMesh.position.set(0, yOffset, 0);
+            slotMesh.userData = { id: 'queue', slotNumber: i, data: ARCHITECTURE_DATA['queue'] };
+            queueGroup.add(slotMesh);
+            queueSlotMeshes.push(slotMesh);
+            interactiveMeshes.push(slotMesh);
+        }
+        meshLookup['queue'] = queueSlotMeshes[5]; // reference head
+
+        // Floating label for Queue
+        function createFloatingTextSprite(text, color = '#f59e0b', scaleX = 4, scaleY = 1.2) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 1024, 256);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 58px "Fira Code", monospace';
+            ctx.fillStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 14;
+            ctx.fillText(text, 512, 128);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(scaleX, scaleY, 1);
+            return sprite;
+        }
+
+        const queueLabel = createFloatingTextSprite('Instruction Stream Byte Queue', '#fbbf24', 5.5, 1.3);
+        queueLabel.position.set(4.0, 8.4, 0);
+        rootArchitectureGroup.add(queueLabel);
+
+        // 5. Control System (Instruction Decoder)
+        const ctrlTex = createBlockFrontTexture('Control System', 'Decoder & Bus Timing Generator', {
+            bgColor: '#3b0764',
+            accentColor: '#c084fc',
+            textColor: '#faf5ff',
+            subColor: '#e9d5ff'
+        });
+        const ctrlMesh = createSharpBoxMesh(4.6, 1.6, 1.4, ctrlTex, 0x2e0854, 0xc084fc);
+        ctrlMesh.position.set(4.0, 0.4, 0);
+        registerBlock(ctrlMesh, 'control', 0xc084fc);
+
+        // 6. 16-bit ALU - Iconic Chevron / V-Shape Geometry
+        const aluTex = createSharpCanvasTexture(1024, 1024, (ctx, w, h) => {
+            const cw = Number(w) || 1024;
+            const ch = Number(h) || 1024;
+            ctx.fillStyle = '#680826';
+            ctx.fillRect(0, 0, cw, ch);
+            ctx.lineWidth = 20;
+            ctx.strokeStyle = '#f43f5e';
+            ctx.strokeRect(10, 10, cw - 20, ch - 20);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 96px "Fira Code", monospace';
+            ctx.shadowColor = '#f43f5e';
+            ctx.shadowBlur = 24;
+            ctx.fillText('Arithmetic', cw / 2, ch * 0.42);
+            ctx.fillText('Logic Unit', cw / 2, ch * 0.54);
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fda4af';
+            ctx.font = 'bold 44px "Inter", sans-serif';
+            ctx.fillText('16-BIT ALU', cw / 2, ch * 0.68);
+        });
+
+        const aluShape = new THREE.Shape();
+        aluShape.moveTo(-3.2, 1.6);
+        aluShape.lineTo(-1.2, -1.6);
+        aluShape.lineTo(1.2, -1.6);
+        aluShape.lineTo(3.2, 1.6);
+        aluShape.lineTo(1.4, 1.6);
+        aluShape.lineTo(0.0, -0.2);
+        aluShape.lineTo(-1.4, 1.6);
+        aluShape.closePath();
+
+        const aluExtrude = { depth: 1.4, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.08, bevelThickness: 0.08 };
+        const aluGeo = new THREE.ExtrudeGeometry(aluShape, aluExtrude);
+        aluGeo.center();
+
+        const aluMat = new THREE.MeshStandardMaterial({
+            map: aluTex,
+            roughness: 0.25,
+            metalness: 0.2,
+            emissive: 0xbe123c,
+            emissiveIntensity: 0.2
+        });
+        const aluMesh = new THREE.Mesh(aluGeo, aluMat);
+        aluMesh.position.set(1.5, -4.5, 0);
+
+        const aluEdges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(aluGeo),
+            new THREE.LineBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.85 })
+        );
+        aluMesh.add(aluEdges);
+        registerBlock(aluMesh, 'alu', 0xf43f5e);
+
+        // 7. Operands / Flags (Directly under ALU)
+        const flagsTex = createBlockFrontTexture('Operands / Flags', 'Status & Machine Control Registers', {
+            bgColor: '#500724',
+            accentColor: '#f43f5e',
+            textColor: '#fff1f2',
+            subColor: '#fecdd3'
+        });
+        const flagsMesh = createSharpBoxMesh(4.4, 1.3, 1.4, flagsTex, 0x40061d, 0xf43f5e);
+        flagsMesh.position.set(1.5, -7.8, 0);
+        registerBlock(flagsMesh, 'flags', 0xf43f5e);
+
+        // 8. General Purpose & Pointer Registers (EU Stack on Left)
+        const euRegisters = [
+            { id: 'reg_ax', split: true, left: 'AH', right: 'AL', name: 'AX', sub: 'Accumulator', y: -2.6 },
+            { id: 'reg_bx', split: true, left: 'BH', right: 'BL', name: 'BX', sub: 'Base Register', y: -3.6 },
+            { id: 'reg_cx', split: true, left: 'CH', right: 'CL', name: 'CX', sub: 'Count Register', y: -4.6 },
+            { id: 'reg_dx', split: true, left: 'DH', right: 'DL', name: 'DX', sub: 'Data Register', y: -5.6 },
+            { id: 'reg_sp', split: false, name: 'SP', sub: 'Stack Pointer', y: -6.6 },
+            { id: 'reg_bp', split: false, name: 'BP', sub: 'Base Pointer', y: -7.6 },
+            { id: 'reg_si', split: false, name: 'SI', sub: 'Source Index', y: -8.6 },
+            { id: 'reg_di', split: false, name: 'DI', sub: 'Destination Index', y: -9.6 }
+        ];
+
+        euRegisters.forEach(reg => {
+            let regTex;
+            if (reg.split) {
+                regTex = createBlockFrontTexture('', '', {
+                    splitDual: true,
+                    dualLeft: reg.left,
+                    dualRight: reg.right,
+                    bgColor: '#083344',
+                    accentColor: '#06b6d4',
+                    textColor: '#ffffff',
+                    subColor: '#a5f3fc'
+                });
+            } else {
+                regTex = createBlockFrontTexture(reg.name, reg.sub, {
+                    bgColor: '#064e3b',
+                    accentColor: '#10b981',
+                    textColor: '#ffffff',
+                    subColor: '#a7f3d0'
+                });
+            }
+
+            const regMesh = createSharpBoxMesh(
+                4.6, 0.95, 1.4,
+                regTex,
+                reg.split ? 0x082f49 : 0x064e3b,
+                reg.split ? 0x06b6d4 : 0x10b981
+            );
+            regMesh.position.set(-4.0, reg.y, 0);
+            registerBlock(regMesh, reg.id, reg.split ? 0x06b6d4 : 0x10b981);
+        });
+
+        // 9. Unit Boundaries (BIU and EU dashed containers matching Fig 6.2)
+        function createDashedBoundary(points, label, colorHex) {
+            const geo = new THREE.BufferGeometry().setFromPoints(points);
+            const mat = new THREE.LineDashedMaterial({
+                color: colorHex,
+                dashSize: 0.5,
+                gapSize: 0.35,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.6
+            });
+            const line = new THREE.Line(geo, mat);
+            line.computeLineDistances();
+            line.position.z = -0.8;
+
+            const labelSprite = createFloatingTextSprite(label, '#' + colorHex.toString(16).padStart(6, '0'), 3.2, 1.1);
+            labelSprite.position.set(points[0].x + 2.0, points[0].y - 0.7, 0);
+            line.add(labelSprite);
+
+            return line;
+        }
+
+        const biuPoints = [
+            new THREE.Vector3(-8.5, 11.2, 0),
+            new THREE.Vector3(8.5, 11.2, 0),
+            new THREE.Vector3(8.5, 1.6, 0),
+            new THREE.Vector3(1.2, 1.6, 0),
+            new THREE.Vector3(1.2, -0.4, 0),
+            new THREE.Vector3(-8.5, -0.4, 0),
+            new THREE.Vector3(-8.5, 11.2, 0)
+        ];
+        rootArchitectureGroup.add(createDashedBoundary(biuPoints, 'BIU', 0x38bdf8));
+
+        const euPoints = [
+            new THREE.Vector3(-8.5, -0.4, 0),
+            new THREE.Vector3(1.2, -0.4, 0),
+            new THREE.Vector3(1.2, 1.6, 0),
+            new THREE.Vector3(8.5, 1.6, 0),
+            new THREE.Vector3(8.5, -11.0, 0),
+            new THREE.Vector3(-8.5, -11.0, 0),
+            new THREE.Vector3(-8.5, -0.4, 0)
+        ];
+        rootArchitectureGroup.add(createDashedBoundary(euPoints, 'EU', 0xf43f5e));
+
+        // Fig 6.2 Diagram Caption Sprite at bottom
+        const captionSprite = createFloatingTextSprite('Fig. 6.2 8086 Internal block diagram', '#e2e8f0', 9.0, 1.6);
+        captionSprite.position.set(0, -12.4, 0);
+        rootArchitectureGroup.add(captionSprite);
+        const busesGroup = new THREE.Group();
+        rootArchitectureGroup.add(busesGroup);
+
+        const busTubes = [];
+        const pulsePackets = [];
+
+        // Helper: Create 3D Arrowhead Cone
+        function createArrowCone(pos, dir, color = 0x38bdf8, size = 0.45) {
+            const coneGeo = new THREE.ConeGeometry(size * 0.65, size * 1.5, 16);
+            coneGeo.translate(0, size * 0.75, 0); // pivot at base
+            const coneMat = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.5,
+                metalness: 0.5,
+                roughness: 0.2
+            });
+            const cone = new THREE.Mesh(coneGeo, coneMat);
+            cone.position.copy(pos);
+
+            // Orient cone along dir vector
+            const normalizedDir = dir.clone().normalize();
+            const up = new THREE.Vector3(0, 1, 0);
+            const quat = new THREE.Quaternion().setFromUnitVectors(up, normalizedDir);
+            cone.setRotationFromQuaternion(quat);
+
+            busesGroup.add(cone);
+            return cone;
+        }
+
+        // Helper: Create 3D Bus Line with optional Start and End Arrowheads
+        function create3DBusLine(points, options = {}) {
+            const {
+                color = 0x38bdf8,
+                radius = 0.08,
+                hasStartArrow = false,
+                hasEndArrow = false,
+                dashed = false,
+                arrowSize = 0.45
+            } = options;
+
+            const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.0);
+
+            let busMesh;
+            if (dashed) {
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                const mat = new THREE.LineDashedMaterial({
+                    color: color,
+                    dashSize: 0.35,
+                    gapSize: 0.25,
+                    linewidth: 3
+                });
+                busMesh = new THREE.Line(geo, mat);
+                busMesh.computeLineDistances();
+            } else {
+                const tubeGeo = new THREE.TubeGeometry(curve, 64, radius, 8, false);
+                const tubeMat = new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.4,
+                    roughness: 0.3,
+                    metalness: 0.6
+                });
+                busMesh = new THREE.Mesh(tubeGeo, tubeMat);
+            }
+            busesGroup.add(busMesh);
+
+            // Arrowhead at Start
+            if (hasStartArrow && points.length >= 2) {
+                const startDir = new THREE.Vector3().subVectors(points[0], points[1]);
+                createArrowCone(points[0], startDir, color, arrowSize);
+            }
+
+            // Arrowhead at End
+            if (hasEndArrow && points.length >= 2) {
+                const endDir = new THREE.Vector3().subVectors(points[points.length - 1], points[points.length - 2]);
+                createArrowCone(points[points.length - 1], endDir, color, arrowSize);
+            }
+
+            const item = { curve, points, mesh: busMesh, color };
+            busTubes.push(item);
+            return item;
+        }
+
+        // 1. Adder Output -> Memory Interface (Upward Arrow)
+        create3DBusLine([
+            new THREE.Vector3(-4.0, 7.9, 0.8),
+            new THREE.Vector3(-4.0, 9.1, 0.8)
+        ], { color: 0x38bdf8, hasEndArrow: true, radius: 0.09 });
+
+        // 2. B-Bus: Feeds left input of Σ Adder from Segment Registers
+        create3DBusLine([
+            new THREE.Vector3(-4.0, 0.8, 0.8),
+            new THREE.Vector3(-6.7, 0.8, 0.8),
+            new THREE.Vector3(-6.7, 7.1, 0.8),
+            new THREE.Vector3(-5.4, 7.1, 0.8)
+        ], { color: 0x00f0ff, hasEndArrow: true, radius: 0.09 });
+
+        const bBusLabel = createFloatingTextSprite('B-bus', '#00f0ff', 2.0, 0.9);
+        bBusLabel.position.set(-7.5, 4.0, 0.8);
+        rootArchitectureGroup.add(bBusLabel);
+
+        // 3. Right input to Σ Adder from internal Segment bus
+        create3DBusLine([
+            new THREE.Vector3(-2.8, 4.8, 0.8),
+            new THREE.Vector3(-2.8, 7.1, 0.8)
+        ], { color: 0x00f0ff, hasEndArrow: true, radius: 0.09 });
+
+        // 4. C-Bus: From Memory Interface / Adder top over to Queue Byte 6
+        create3DBusLine([
+            new THREE.Vector3(-4.0, 8.5, 0.8),
+            new THREE.Vector3(4.0, 8.5, 0.8),
+            new THREE.Vector3(4.0, 6.6, 0.8)
+        ], { color: 0xf59e0b, hasEndArrow: true, radius: 0.09 });
+
+        const cBusLabel = createFloatingTextSprite('C-Bus', '#fbbf24', 2.2, 0.9);
+        cBusLabel.position.set(0.0, 8.9, 0.8);
+        rootArchitectureGroup.add(cBusLabel);
+
+        // 5. Queue Byte 1 (Head) -> Control System (Downward Arrow)
+        create3DBusLine([
+            new THREE.Vector3(4.0, 1.8, 0.8),
+            new THREE.Vector3(4.0, 1.2, 0.8)
+        ], { color: 0xc084fc, hasEndArrow: true, radius: 0.09 });
+
+        // 6. Control System -> A-Bus (Downward Arrow)
+        create3DBusLine([
+            new THREE.Vector3(4.0, -0.4, 0.8),
+            new THREE.Vector3(4.0, -1.2, 0.8)
+        ], { color: 0xc084fc, hasEndArrow: true, radius: 0.09 });
+
+        // 7. EU Internal A-Bus: Main highway across EU
+        create3DBusLine([
+            new THREE.Vector3(-7.2, -1.2, 0.8),
+            new THREE.Vector3(6.5, -1.2, 0.8),
+            new THREE.Vector3(6.5, -9.6, 0.8)
+        ], { color: 0xf43f5e, radius: 0.12 });
+
+        const aBusLabel = createFloatingTextSprite('A-Bus', '#f43f5e', 2.2, 0.9);
+        aBusLabel.position.set(-0.8, -0.8, 0.8);
+        rootArchitectureGroup.add(aBusLabel);
+
+        // 8. Vertical Bidirectional Arrow: BIU (IP) <---> A-Bus
+        create3DBusLine([
+            new THREE.Vector3(-4.0, 0.3, 0.8),
+            new THREE.Vector3(-4.0, -1.2, 0.8)
+        ], { color: 0x38bdf8, hasStartArrow: true, hasEndArrow: true, radius: 0.08, arrowSize: 0.38 });
+
+        // 9. Vertical Bidirectional Arrow: EU Registers (AX) <---> A-Bus
+        create3DBusLine([
+            new THREE.Vector3(-4.0, -1.2, 0.8),
+            new THREE.Vector3(-4.0, -2.1, 0.8)
+        ], { color: 0x06b6d4, hasStartArrow: true, hasEndArrow: true, radius: 0.08, arrowSize: 0.38 });
+
+        // 10. A-Bus to ALU: Two downward input arrows into top horns
+        // Left ALU Operand Input
+        create3DBusLine([
+            new THREE.Vector3(0.1, -1.2, 0.8),
+            new THREE.Vector3(0.1, -3.1, 0.8)
+        ], { color: 0xf43f5e, hasEndArrow: true, radius: 0.09 });
+
+        // Right ALU Operand Input
+        create3DBusLine([
+            new THREE.Vector3(2.9, -1.2, 0.8),
+            new THREE.Vector3(2.9, -3.1, 0.8)
+        ], { color: 0xf43f5e, hasEndArrow: true, radius: 0.09 });
+
+        // 11. ALU to Operands / Flags: Dashed downward arrow
+        create3DBusLine([
+            new THREE.Vector3(1.5, -5.9, 0.8),
+            new THREE.Vector3(1.5, -7.1, 0.8)
+        ], { color: 0xf43f5e, dashed: true, hasEndArrow: true });
+
+        // 12. ALU Output Bus: Wide conduit exiting ALU right, terminating with arrow into vertical trunk of A-Bus
+        create3DBusLine([
+            new THREE.Vector3(2.3, -5.6, 0.8),
+            new THREE.Vector3(6.5, -5.6, 0.8)
+        ], { color: 0x10b981, hasEndArrow: true, radius: 0.1 });
+
+        // 13. Horizontal Bidirectional Arrow: Operands / Flags <---> A-Bus
+        create3DBusLine([
+            new THREE.Vector3(3.7, -7.8, 0.8),
+            new THREE.Vector3(6.5, -7.8, 0.8)
+        ], { color: 0x10b981, hasStartArrow: true, hasEndArrow: true, radius: 0.08, arrowSize: 0.38 });
+
+        // Glowing Animated Bus Data Packets
+        function addBusPulsePacket(curve, color = 0x00f0ff, speed = 0.004) {
+            const sphereGeo = new THREE.SphereGeometry(0.24, 16, 16);
+            const sphereMat = new THREE.MeshBasicMaterial({ color: color });
+            const mesh = new THREE.Mesh(sphereGeo, sphereMat);
+            scene.add(mesh);
+
+            const sprite = createFloatingTextSprite('•', '#ffffff', 0.9, 0.9);
+            mesh.add(sprite);
+
+            const packet = { curve, mesh, progress: Math.random(), speed, active: true };
+            pulsePackets.push(packet);
+            return packet;
+        }
+
+        // Add animated packets along the principal buses
+        addBusPulsePacket(busTubes[1].curve, 0x00f0ff, 0.0035); // B-bus
+        addBusPulsePacket(busTubes[3].curve, 0xf59e0b, 0.004);  // C-Bus
+        addBusPulsePacket(busTubes[6].curve, 0xf43f5e, 0.003);  // A-Bus
+        addBusPulsePacket(busTubes[11].curve, 0x10b981, 0.005); // ALU output
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredObject = null;
+        let selectedObject = null;
+
+        const tooltip = document.getElementById('hover-tooltip');
+        const tooltipText = document.getElementById('tooltip-text');
+        const tooltipDot = document.getElementById('tooltip-dot');
+
+        function onPointerMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            tooltip.style.left = `${event.clientX}px`;
+            tooltip.style.top = `${event.clientY}px`;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveMeshes);
+
+            if (intersects.length > 0) {
+                const topMesh = intersects[0].object;
+                if (hoveredObject !== topMesh) {
+                    if (hoveredObject && hoveredObject !== selectedObject) {
+                        unhighlightMesh(hoveredObject);
+                    }
+                    hoveredObject = topMesh;
+                    if (hoveredObject !== selectedObject) {
+                        highlightMesh(hoveredObject, 0.45);
+                    }
+
+                    const data = hoveredObject.userData.data;
+                    if (data) {
+                        tooltipText.textContent = data.name;
+                        tooltipDot.className = `w-2.5 h-2.5 rounded-full ${data.unit === 'BIU' ? 'bg-sky-400' : 'bg-rose-400'} animate-ping`;
+                        tooltip.style.opacity = '1';
+                        tooltip.style.transform = 'translate(-50%, -120%) scale(1)';
+                    }
+                }
+                document.body.style.cursor = 'pointer';
+            } else {
+                if (hoveredObject) {
+                    if (hoveredObject !== selectedObject) {
+                        unhighlightMesh(hoveredObject);
+                    }
+                    hoveredObject = null;
+                    tooltip.style.opacity = '0';
+                    tooltip.style.transform = 'translate(-50%, -100%) scale(0.95)';
+                }
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function highlightMesh(mesh, intensity = 0.4) {
+            if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(mat => {
+                    if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = intensity;
+                });
+            } else if (mesh.material && mesh.material.emissiveIntensity !== undefined) {
+                mesh.material.emissiveIntensity = intensity;
+            }
+            mesh.position.z = 0.35; // Pop forward in 3D
+        }
+
+        function unhighlightMesh(mesh) {
+            if (Array.isArray(mesh.material)) {
+                mesh.material.forEach((mat, idx) => {
+                    if (mat.emissiveIntensity !== undefined) mat.emissiveIntensity = (idx === 4) ? 0.25 : 0.15;
+                });
+            } else if (mesh.material && mesh.material.emissiveIntensity !== undefined) {
+                mesh.material.emissiveIntensity = 0.18;
+            }
+            mesh.position.z = 0.0;
+        }
+
+        function onPointerClick(event) {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveMeshes);
+
+            if (intersects.length > 0) {
+                const clickedMesh = intersects[0].object;
+                selectComponent(clickedMesh.userData.id);
+            }
+        }
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('click', onPointerClick);
+
+        let targetCamPos = null;
+        let targetLookAt = null;
+
+        function smoothMoveCamera(x, y, z, lookX = 0, lookY = 0, lookZ = 0) {
+            targetCamPos = new THREE.Vector3(x, y, z);
+            targetLookAt = new THREE.Vector3(lookX, lookY, lookZ);
+        }
+
+        const drawer = document.getElementById('inspector-drawer');
+        const drawerCloseBtn = document.getElementById('drawer-close-btn');
+        const drawerTitle = document.getElementById('drawer-title');
+        const drawerSubtitle = document.getElementById('drawer-subtitle');
+        const drawerUnitBadge = document.getElementById('drawer-unit-badge');
+        const drawerTag = document.getElementById('drawer-tag');
+        const drawerDesc = document.getElementById('drawer-description');
+        const drawerBusConns = document.getElementById('drawer-bus-conns');
+        const drawerSpecs = document.getElementById('drawer-specs');
+        const drawerAsm = document.getElementById('drawer-asm-example');
+        const drawerFocusBtn = document.getElementById('drawer-focus-3d-btn');
+
+        // Tool Sub-containers
+        const toolAddrCalc = document.getElementById('tool-address-calc');
+        const toolFlags = document.getElementById('tool-flags-inspector');
+        const toolQueue = document.getElementById('tool-queue-simulator');
+        const toolAlu = document.getElementById('tool-alu-simulator');
+
+        function selectComponent(compId) {
+            const data = ARCHITECTURE_DATA[compId];
+            if (!data) return;
+
+            if (selectedObject) {
+                unhighlightMesh(selectedObject);
+            }
+
+            const mesh = meshLookup[compId];
+            if (mesh) {
+                selectedObject = mesh;
+                highlightMesh(selectedObject, 0.7);
+            }
+
+            drawerTitle.textContent = data.name;
+            drawerSubtitle.textContent = data.subtitle;
+            drawerTag.textContent = data.group.toUpperCase();
+            drawerDesc.textContent = data.desc;
+            drawerBusConns.textContent = data.busConns;
+            drawerSpecs.textContent = data.specs;
+            drawerAsm.textContent = data.asm;
+
+            if (data.unit === 'BIU') {
+                drawerUnitBadge.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase bg-sky-500/20 text-sky-300 border border-sky-500/30';
+                drawerUnitBadge.textContent = 'BUS INTERFACE UNIT';
+            } else {
+                drawerUnitBadge.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30';
+                drawerUnitBadge.textContent = 'EXECUTION UNIT';
+            }
+
+            toolAddrCalc.classList.add('hidden');
+            toolFlags.classList.add('hidden');
+            toolQueue.classList.add('hidden');
+            toolAlu.classList.add('hidden');
+
+            if (data.tool === 'calc') {
+                toolAddrCalc.classList.remove('hidden');
+            } else if (data.tool === 'flags') {
+                toolFlags.classList.remove('hidden');
+            } else if (data.tool === 'queue') {
+                toolQueue.classList.remove('hidden');
+            } else if (data.tool === 'alu') {
+                toolAlu.classList.remove('hidden');
+            }
+
+            drawer.classList.remove('translate-x-full');
+
+            drawerFocusBtn.onclick = () => {
+                if (mesh) {
+                    const wp = new THREE.Vector3();
+                    mesh.getWorldPosition(wp);
+                    smoothMoveCamera(wp.x, wp.y, 14, wp.x, wp.y, 0);
+                }
+            };
+        }
+
+        drawerCloseBtn.addEventListener('click', () => {
+            drawer.classList.add('translate-x-full');
+            if (selectedObject) {
+                unhighlightMesh(selectedObject);
+                selectedObject = null;
+            }
+        });
+
+        document.getElementById('component-select').addEventListener('change', (e) => {
+            if (e.target.value) {
+                selectComponent(e.target.value);
+                const mesh = meshLookup[e.target.value];
+                if (mesh) {
+                    const wp = new THREE.Vector3();
+                    mesh.getWorldPosition(wp);
+                    smoothMoveCamera(wp.x, wp.y, 16, wp.x, wp.y, 0);
+                }
+            }
+        });
+        // 1. 20-bit Physical Address Calculator
+        const calcSegInput = document.getElementById('calc-segment');
+        const calcOffInput = document.getElementById('calc-offset');
+        const calcShifted = document.getElementById('calc-shifted');
+        const calcOffsetDisp = document.getElementById('calc-offset-disp');
+        const calcResult = document.getElementById('calc-result');
+
+        function updateAddressCalc() {
+            const segVal = parseInt(calcSegInput.value || '0', 16) & 0xFFFF;
+            const offVal = parseInt(calcOffInput.value || '0', 16) & 0xFFFF;
+            const shifted = (segVal << 4) & 0xFFFFF;
+            const physical = (shifted + offVal) & 0xFFFFF;
+
+            calcShifted.textContent = shifted.toString(16).toUpperCase().padStart(5, '0') + ' H';
+            calcOffsetDisp.textContent = offVal.toString(16).toUpperCase().padStart(5, '0') + ' H';
+            calcResult.textContent = physical.toString(16).toUpperCase().padStart(5, '0') + ' H';
+        }
+        calcSegInput.addEventListener('input', updateAddressCalc);
+        calcOffInput.addEventListener('input', updateAddressCalc);
+
+        // 2. Interactive Flag Register Inspector
+        const flagDescriptions = {
+            OF: 'Overflow Flag: Set when signed arithmetic produces a value too large for destination register.',
+            DF: 'Direction Flag: Governs string scan direction (0=Auto-increment/CLD, 1=Auto-decrement/STD).',
+            IF: 'Interrupt Flag: Enables maskable hardware interrupts when set (STI/CLI).',
+            TF: 'Trap/Single-Step Flag: Causes single-step interrupt after each instruction for live debugging.',
+            SF: 'Sign Flag: Mirrors the most significant bit (MSB), indicating negative signed numbers.',
+            ZF: 'Zero Flag: Set when the result of an arithmetic or logical operation is exactly zero.',
+            AF: 'Auxiliary Carry Flag: Set if carry out from bit 3 to bit 4 occurs (for BCD arithmetic).',
+            PF: 'Parity Flag: Set if lower 8 bits of result contain an even number of 1-bits.',
+            CF: 'Carry Flag: Set when an unsigned operation overflows or borrows from highest bit.'
+        };
+        const flagExplanation = document.getElementById('flag-explanation');
+        document.querySelectorAll('.flag-bit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const valElem = btn.querySelector('.flag-val');
+                const curr = valElem.textContent.trim();
+                const next = curr === '1' ? '0' : '1';
+                valElem.textContent = next;
+
+                if (next === '1') {
+                    btn.classList.add('bg-rose-950/80', 'border-rose-500');
+                    btn.classList.remove('bg-slate-800', 'border-slate-700');
+                } else {
+                    btn.classList.remove('bg-rose-950/80', 'border-rose-500');
+                    btn.classList.add('bg-slate-800', 'border-slate-700');
+                }
+
+                const flagKey = btn.getAttribute('data-flag');
+                flagExplanation.textContent = `${flagKey} = ${next}: ${flagDescriptions[flagKey]}`;
+            });
+        });
+
+        // 3. FIFO Queue Simulator
+        const sampleOpcodePool = ['90 (NOP)', '8B (MOV)', '03 (ADD)', '2B (SUB)', '50 (PUSH)', '58 (POP)', 'E9 (JMP)', 'C3 (RET)'];
+        let queueContents = ['90', 'E9', 'D8', '03', 'C3', '8B']; // Q1 to Q6
+
+        function renderQueue() {
+            document.querySelectorAll('.queue-slot').forEach(slot => {
+                const slotNum = parseInt(slot.getAttribute('data-slot')); // 1..6
+                const byte = queueContents[slotNum - 1] || '--';
+                slot.querySelector('.slot-byte').textContent = byte;
+                if (byte === '--') {
+                    slot.classList.add('opacity-40');
+                } else {
+                    slot.classList.remove('opacity-40');
+                }
+            });
+        }
+        document.getElementById('btn-queue-push').addEventListener('click', () => {
+            if (queueContents.length < 6) {
+                const randomByte = sampleOpcodePool[Math.floor(Math.random() * sampleOpcodePool.length)].split(' ')[0];
+                queueContents.push(randomByte);
+                renderQueue();
+            }
+        });
+        document.getElementById('btn-queue-pop').addEventListener('click', () => {
+            if (queueContents.length > 0) {
+                queueContents.shift();
+                renderQueue();
+            }
+        });
+        renderQueue();
+
+        // 4. Interactive 16-bit ALU Simulator
+        const aluInputA = document.getElementById('alu-input-a');
+        const aluInputB = document.getElementById('alu-input-b');
+        const aluOpSelect = document.getElementById('alu-op-select');
+        const aluResultDisp = document.getElementById('alu-calc-result');
+        const aluZf = document.getElementById('alu-zf');
+        const aluSf = document.getElementById('alu-sf');
+        const aluCf = document.getElementById('alu-cf');
+
+        function runAluSimulation() {
+            const a = parseInt(aluInputA.value || '0', 16) & 0xFFFF;
+            const b = parseInt(aluInputB.value || '0', 16) & 0xFFFF;
+            const op = aluOpSelect.value;
+            let result = 0;
+            let carry = 0;
+
+            switch(op) {
+                case 'ADD':
+                    result = a + b;
+                    carry = result > 0xFFFF ? 1 : 0;
+                    break;
+                case 'SUB':
+                    result = a - b;
+                    carry = a < b ? 1 : 0;
+                    break;
+                case 'AND': result = a & b; break;
+                case 'OR':  result = a | b; break;
+                case 'XOR': result = a ^ b; break;
+            }
+
+            const truncated = result & 0xFFFF;
+            aluResultDisp.textContent = truncated.toString(16).toUpperCase().padStart(4, '0') + ' H';
+            aluZf.textContent = truncated === 0 ? '1' : '0';
+            aluSf.textContent = (truncated & 0x8000) !== 0 ? '1' : '0';
+            aluCf.textContent = carry.toString();
+        }
+        aluInputA.addEventListener('input', runAluSimulation);
+        aluInputB.addEventListener('input', runAluSimulation);
+        aluOpSelect.addEventListener('change', runAluSimulation);
+
+        // View Presets
+        document.getElementById('view-diagram').addEventListener('click', () => {
+            smoothMoveCamera(0, -0.4, 30, 0, -0.4, 0);
+        });
+        document.getElementById('view-default').addEventListener('click', () => {
+            smoothMoveCamera(10, 8, 30, 0, -0.4, 0);
+        });
+        document.getElementById('view-biu').addEventListener('click', () => {
+            smoothMoveCamera(-1.0, 5.0, 20, -1.0, 5.0, 0);
+        });
+        document.getElementById('view-eu').addEventListener('click', () => {
+            smoothMoveCamera(-0.5, -5.5, 20, -0.5, -5.5, 0);
+        });
+        document.getElementById('view-alu').addEventListener('click', () => {
+            smoothMoveCamera(1.5, -6.0, 14, 1.5, -6.0, 0);
+        });
+
+        // Guide Modal
+        const guideModal = document.getElementById('guide-modal');
+        document.getElementById('btn-guide').addEventListener('click', () => {
+            guideModal.classList.remove('hidden');
+        });
+        document.getElementById('guide-modal-close').addEventListener('click', () => {
+            guideModal.classList.add('hidden');
+        });
+        guideModal.addEventListener('click', (e) => {
+            if (e.target === guideModal) guideModal.classList.add('hidden');
+        });
+        const simStatusBadge = document.getElementById('sim-status-badge');
+        const simDescription = document.getElementById('sim-description');
+        const simPlayBtn = document.getElementById('sim-play-btn');
+        const simStepBtn = document.getElementById('sim-step-btn');
+        const simResetBtn = document.getElementById('sim-reset-btn');
+
+        // Detailed Pipeline Steps with Rich Telemetry Data
+        const pipelineSteps = [
+            {
+                step: 1,
+                name: 'FETCH',
+                badge: 'PHASE 1: FETCH CYCLE',
+                desc: 'CS & IP routed through B-Bus into Σ Adder -> Physical address generated -> Memory Interface begins memory read.',
+                activeStepId: 'step-1',
+                instruction: 'ADD AX, [BX+04H]',
+                fromName: 'CS & IP Registers',
+                fromDetail: 'CS: 2000H | IP: 0104H',
+                fromUnit: 'BIU',
+                fromBlock: 'reg_cs',
+                toName: 'Σ Adder & Mem Interface',
+                toDetail: '20-bit Summing & External Bus',
+                toUnit: 'BIU',
+                toBlock: 'mem_interface',
+                conduit: 'B-Bus (Internal Segment Bus) -> Σ Adder',
+                activeBusIndex: 1,
+                signals: {
+                    addr: '20104 H',
+                    data: 'Tri-state / Float',
+                    ctrl: 'ALE = 1 • M/IO# = 1 • RD# = 0'
+                },
+                timing: 'T1 - Address Latch Enable',
+                how: 'The Bus Interface Unit (BIU) pairs the 16-bit Code Segment (CS=2000H) with Instruction Pointer (IP=0104H). These travel along the B-Bus into the dedicated Σ adder, which shifts CS left by 4 bits (20000H) and adds IP (0104H) to produce physical address 20104H. This 20-bit address is latched into the Memory Interface to trigger a system memory read cycle.'
+            },
+            {
+                step: 2,
+                name: 'QUEUE',
+                badge: 'PHASE 2: PREFETCH QUEUE',
+                desc: 'Instruction opcode byte retrieved from memory travels along C-Bus into Queue Slot 6 (tail).',
+                activeStepId: 'step-2',
+                instruction: 'ADD AX, [BX+04H]',
+                fromName: 'Memory Interface',
+                fromDetail: 'External Data Bus Receiver',
+                fromUnit: 'BIU',
+                fromBlock: 'mem_interface',
+                toName: 'Instruction Queue (Slot 6)',
+                toDetail: '6-Byte FIFO Prefetch Buffer',
+                toUnit: 'BIU',
+                toBlock: 'queue',
+                conduit: 'C-Bus (Top 8-bit Prefetch Highway)',
+                activeBusIndex: 3,
+                signals: {
+                    addr: '20104 H',
+                    data: '03H (ADD Opcode)',
+                    ctrl: 'READY = 1 • BHE# = 0 • DEN# = 0'
+                },
+                timing: 'T3/T4 - Opcode Ingress',
+                how: 'The system memory returns opcode byte 03H via the data bus lines (AD0-AD7). The Memory Interface receives the byte and drives it rightward along the top C-Bus directly into Slot 6 of the 6-byte FIFO Instruction Stream Queue. This autonomous prefetching keeps the pipeline saturated while the Execution Unit finishes previous computations.'
+            },
+            {
+                step: 3,
+                name: 'DECODE',
+                badge: 'PHASE 3: INSTRUCTION DECODE',
+                desc: 'Byte 1 popped from queue head into EU Control System -> Decoded into microcode control signals.',
+                activeStepId: 'step-3',
+                instruction: 'ADD AX, [BX+04H]',
+                fromName: 'Queue Slot 1 (Head)',
+                fromDetail: 'FIFO First Out: Opcode 03H',
+                fromUnit: 'BIU',
+                fromBlock: 'queue',
+                toName: 'Control System (EU)',
+                toDetail: 'Instruction Decoder & Sequencer',
+                toUnit: 'EU',
+                toBlock: 'control',
+                conduit: 'Direct Inter-Unit Bus (Queue -> Decoder)',
+                activeBusIndex: 4,
+                signals: {
+                    addr: 'Internal Transfer',
+                    data: '03H -> Microcode Entry',
+                    ctrl: 'QS0/QS1 = 01 (First Byte Popped)'
+                },
+                timing: 'EU Micro-cycle 1',
+                how: 'Opcode byte 03H pops out of the head of the FIFO Queue (Slot 1) and enters the Execution Unit (EU) Control System. The decoder analyzes the bitfield (0000 0011b = ADD reg16, r/m16), triggering microcode routines that configure the internal A-Bus, select AX as the destination operand, and dispatch bus commands to read the memory operand.'
+            },
+            {
+                step: 4,
+                name: 'EXECUTE',
+                badge: 'PHASE 4: 16-BIT ALU EXECUTE',
+                desc: 'Operands routed via A-Bus into ALU upper horns -> 16-bit binary addition computed -> Condition flags updated.',
+                activeStepId: 'step-4',
+                instruction: 'ADD AX, [BX+04H]',
+                fromName: 'AX Register & A-Bus',
+                fromDetail: 'OpA: 001FH | OpB: 0005H',
+                fromUnit: 'EU',
+                fromBlock: 'reg_ax',
+                toName: '16-bit ALU & Flags',
+                toDetail: 'Chevron Core Computational Unit',
+                toUnit: 'EU',
+                toBlock: 'alu',
+                conduit: 'EU Internal A-Bus -> ALU Dual Input Horns',
+                activeBusIndex: 6,
+                signals: {
+                    addr: 'Effective: [BX+04H]',
+                    data: 'OpA: 001FH + OpB: 0005H',
+                    ctrl: 'ALU_OP = ADD16 • Carry Lookahead'
+                },
+                timing: 'ALU Clock State T_alu',
+                how: 'The Control System gates operand A from the AX accumulator register (001FH) and operand B from memory (0005H) onto the 16-bit internal A-Bus. The operands enter the dual top horns of the chevron-shaped 16-bit ALU. The ALU performs fast 16-bit binary addition, producing sum 0024H and setting the condition status flags (Zero=0, Sign=0, Carry=0, Overflow=0).'
+            },
+            {
+                step: 5,
+                name: 'WRITEBACK',
+                badge: 'PHASE 5: RESULT WRITEBACK',
+                desc: 'ALU sum routed out through right return bus into A-Bus trunk -> Latched into destination register AX.',
+                activeStepId: 'step-5',
+                instruction: 'ADD AX, [BX+04H]',
+                fromName: 'ALU Output Port',
+                fromDetail: 'Arithmetic Result: 0024H',
+                fromUnit: 'EU',
+                fromBlock: 'alu',
+                toName: 'AX Register (AH|AL)',
+                toDetail: 'Primary Accumulator Latch',
+                toUnit: 'EU',
+                toBlock: 'reg_ax',
+                conduit: 'ALU Output Return Trunk -> A-Bus Highway',
+                activeBusIndex: 11,
+                signals: {
+                    addr: 'Internal Latch',
+                    data: 'Result: 0024 H -> AX',
+                    ctrl: 'REG_WRITE_EN = 1 • FLAGS_LATCH = 1'
+                },
+                timing: 'T_wb - Writeback & Retirement',
+                how: 'The final sum (0024H) emerges from the right side of the ALU and travels along the dedicated return bus directly into the vertical trunk of the A-Bus. The A-Bus routes the result back into AX (AH=00H, AL=24H), overwriting its prior contents. The Flags register latches the outcome, concluding instruction execution while the BIU is already fetching subsequent bytes.'
+            }
+        ];
+
+        let currentPipelineStep = -1;
+        let isPipelinePlaying = false;
+        let pipelineTimer = null;
+        let autoFollowCamera = true;
+
+        // Telemetry DOM References
+        const telemWindow = document.getElementById('sim-telemetry-window');
+        const telemHeaderStatus = document.getElementById('telem-header-status');
+        const telemPulseDot = document.getElementById('telem-pulse-dot');
+        const telemStepBadge = document.getElementById('telem-step-badge');
+        const telemTimingState = document.getElementById('telem-timing-state');
+        const telemInstruction = document.getElementById('telem-instruction');
+        const telemFromName = document.getElementById('telem-from-name');
+        const telemFromDetail = document.getElementById('telem-from-detail');
+        const telemFromUnit = document.getElementById('telem-from-unit');
+        const telemToName = document.getElementById('telem-to-name');
+        const telemToDetail = document.getElementById('telem-to-detail');
+        const telemToUnit = document.getElementById('telem-to-unit');
+        const telemActiveConduit = document.getElementById('telem-active-conduit');
+        const telemSigAddr = document.getElementById('telem-sig-addr');
+        const telemSigData = document.getElementById('telem-sig-data');
+        const telemSigCtrl = document.getElementById('telem-sig-ctrl');
+        const telemHowDesc = document.getElementById('telem-how-desc');
+        const telemTraceLog = document.getElementById('telem-trace-log');
+        const telemCollapseBtn = document.getElementById('telem-collapse-btn');
+        const telemCloseBtn = document.getElementById('telem-close-btn');
+        const telemCamToggle = document.getElementById('telem-cam-toggle');
+        const telemContentBody = document.getElementById('telem-content-body');
+        const btnToggleTelemetry = document.getElementById('btn-toggle-telemetry');
+        const simDockTelemetryBtn = document.getElementById('sim-dock-telemetry-btn');
+
+        let highlightedSourceMesh = null;
+        let highlightedTargetMesh = null;
+
+        function updateTelemetryWindow(step) {
+            if (!telemHeaderStatus) return;
+
+            if (!step) {
+                telemHeaderStatus.textContent = 'STANDBY • Awaiting Cycle';
+                telemHeaderStatus.className = 'text-[10px] text-slate-400 font-mono';
+                if (telemPulseDot) telemPulseDot.classList.add('opacity-40');
+                if (telemStepBadge) {
+                    telemStepBadge.textContent = 'STANDBY';
+                    telemStepBadge.className = 'font-bold text-slate-400 text-sm';
+                }
+                if (telemTimingState) telemTimingState.textContent = 'T-State Idle';
+                if (telemInstruction) telemInstruction.textContent = 'NOP (Idle)';
+                if (telemFromName) telemFromName.textContent = '--';
+                if (telemFromDetail) telemFromDetail.textContent = 'No active transmission';
+                if (telemToName) telemToName.textContent = '--';
+                if (telemToDetail) telemToDetail.textContent = 'No active destination';
+                if (telemActiveConduit) telemActiveConduit.textContent = 'Internal buses quiescent';
+                if (telemSigAddr) telemSigAddr.textContent = '00000 H';
+                if (telemSigData) telemSigData.textContent = '--';
+                if (telemSigCtrl) telemSigCtrl.textContent = 'ALE=0 • M/IO#=0 • RD#=1';
+                if (telemHowDesc) telemHowDesc.textContent = 'The simulation is in standby. Press Play or Step to trace how addresses, opcodes, and operands transit through the 8086 internal buses.';
+                return;
+            }
+
+            telemHeaderStatus.textContent = `BUS CYCLE ACTIVE • ${step.name}`;
+            telemHeaderStatus.className = 'text-[10px] text-cyan-300 font-mono font-bold';
+            if (telemPulseDot) telemPulseDot.classList.remove('opacity-40');
+            if (telemStepBadge) {
+                telemStepBadge.textContent = step.badge;
+                telemStepBadge.className = 'font-bold text-amber-300 text-sm';
+            }
+            if (telemTimingState) telemTimingState.textContent = step.timing;
+            if (telemInstruction) telemInstruction.textContent = step.instruction;
+
+            if (telemFromName) telemFromName.textContent = step.fromName;
+            if (telemFromDetail) telemFromDetail.textContent = step.fromDetail;
+            if (telemFromUnit) {
+                telemFromUnit.textContent = step.fromUnit;
+                telemFromUnit.className = `text-[8px] px-1 rounded ${step.fromUnit === 'BIU' ? 'bg-sky-500/30 text-sky-200' : 'bg-rose-500/30 text-rose-200'}`;
+            }
+
+            if (telemToName) telemToName.textContent = step.toName;
+            if (telemToDetail) telemToDetail.textContent = step.toDetail;
+            if (telemToUnit) {
+                telemToUnit.textContent = step.toUnit;
+                telemToUnit.className = `text-[8px] px-1 rounded ${step.toUnit === 'BIU' ? 'bg-sky-500/30 text-sky-200' : 'bg-rose-500/30 text-rose-200'}`;
+            }
+
+            if (telemActiveConduit) telemActiveConduit.textContent = step.conduit;
+            if (telemSigAddr) telemSigAddr.textContent = step.signals.addr;
+            if (telemSigData) telemSigData.textContent = step.signals.data;
+            if (telemSigCtrl) telemSigCtrl.textContent = step.signals.ctrl;
+            if (telemHowDesc) telemHowDesc.innerHTML = step.how;
+
+            // Add Entry to Activity Log
+            if (telemTraceLog) {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'py-0.5 border-b border-slate-800/60 flex items-center justify-between text-slate-300';
+                logEntry.innerHTML = `
+                    <span><strong class="text-cyan-400">[${step.name}]</strong> ${step.fromName} &rarr; ${step.toName}</span>
+                    <span class="text-amber-400/80 font-mono">${step.timing.split(' ')[0]}</span>
+                `;
+                telemTraceLog.prepend(logEntry);
+                if (telemTraceLog.children.length > 8) {
+                    telemTraceLog.removeChild(telemTraceLog.lastChild);
+                }
+            }
+
+            // Ensure Telemetry Window is visible when stepping
+            if (telemWindow && telemWindow.classList.contains('hidden')) {
+                telemWindow.classList.remove('hidden');
+            }
+        }
+
+        function updatePipelineUI(stepIdx) {
+            // Reset step badges
+            for (let i = 1; i <= 5; i++) {
+                const el = document.getElementById(`step-${i}`);
+                if (el) el.className = 'px-2 py-0.5 rounded transition-all bg-slate-800 text-slate-500';
+            }
+
+            // Reset previously highlighted simulation meshes
+            if (highlightedSourceMesh && highlightedSourceMesh !== selectedObject) {
+                unhighlightMesh(highlightedSourceMesh);
+                highlightedSourceMesh = null;
+            }
+            if (highlightedTargetMesh && highlightedTargetMesh !== selectedObject) {
+                unhighlightMesh(highlightedTargetMesh);
+                highlightedTargetMesh = null;
+            }
+
+            if (stepIdx >= 0 && stepIdx < pipelineSteps.length) {
+                const s = pipelineSteps[stepIdx];
+                simStatusBadge.textContent = s.badge;
+                simStatusBadge.className = 'text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold';
+                simDescription.textContent = s.desc;
+
+                const activeEl = document.getElementById(s.activeStepId);
+                if (activeEl) {
+                    activeEl.className = 'px-2 py-0.5 rounded transition-all bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/30';
+                }
+
+                // Highlight Source & Destination Meshes with distinctive intensities
+                const srcMesh = meshLookup[s.fromBlock];
+                const dstMesh = meshLookup[s.toBlock];
+
+                if (srcMesh) {
+                    highlightMesh(srcMesh, 0.75);
+                    highlightedSourceMesh = srcMesh;
+                }
+                if (dstMesh) {
+                    highlightMesh(dstMesh, 0.6);
+                    highlightedTargetMesh = dstMesh;
+                }
+
+                // Update Telemetry Panel
+                updateTelemetryWindow(s);
+
+                // Auto-camera tracking if enabled
+                if (autoFollowCamera && srcMesh && dstMesh) {
+                    const p1 = new THREE.Vector3();
+                    const p2 = new THREE.Vector3();
+                    srcMesh.getWorldPosition(p1);
+                    dstMesh.getWorldPosition(p2);
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    smoothMoveCamera(midX, midY, 18, midX, midY, 0);
+                }
+            } else {
+                simStatusBadge.textContent = 'STANDBY';
+                simStatusBadge.className = 'text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700';
+                simDescription.textContent = 'Click Play or Step to trace data pulses through B-bus, C-Bus, and A-Bus';
+                updateTelemetryWindow(null);
+            }
+        }
+
+        function stepPipeline() {
+            currentPipelineStep = (currentPipelineStep + 1) % pipelineSteps.length;
+            updatePipelineUI(currentPipelineStep);
+        }
+
+        function togglePlayPipeline() {
+            isPipelinePlaying = !isPipelinePlaying;
+            if (isPipelinePlaying) {
+                simPlayBtn.innerHTML = '<i class="fa-solid fa-pause text-xs"></i> <span>Pause</span>';
+                simPlayBtn.classList.replace('bg-cyan-500', 'bg-rose-500');
+                pipelineTimer = setInterval(stepPipeline, 3200);
+                stepPipeline();
+            } else {
+                simPlayBtn.innerHTML = '<i class="fa-solid fa-play text-xs"></i> <span>Play</span>';
+                simPlayBtn.classList.replace('bg-rose-500', 'bg-cyan-500');
+                clearInterval(pipelineTimer);
+            }
+        }
+
+        function resetPipeline() {
+            if (isPipelinePlaying) togglePlayPipeline();
+            currentPipelineStep = -1;
+            updatePipelineUI(-1);
+        }
+
+        simPlayBtn.addEventListener('click', togglePlayPipeline);
+        simStepBtn.addEventListener('click', () => {
+            if (isPipelinePlaying) togglePlayPipeline();
+            stepPipeline();
+        });
+        simResetBtn.addEventListener('click', resetPipeline);
+
+        // Telemetry Window Interaction Handlers
+        let isTelemCollapsed = false;
+
+        if (telemCollapseBtn && telemContentBody) {
+            telemCollapseBtn.addEventListener('click', () => {
+                isTelemCollapsed = !isTelemCollapsed;
+                if (isTelemCollapsed) {
+                    telemContentBody.classList.add('hidden');
+                    telemCollapseBtn.innerHTML = '<i class="fa-solid fa-chevron-down text-[11px]"></i>';
+                } else {
+                    telemContentBody.classList.remove('hidden');
+                    telemCollapseBtn.innerHTML = '<i class="fa-solid fa-chevron-up text-[11px]"></i>';
+                }
+            });
+        }
+
+        if (telemCloseBtn && telemWindow) {
+            telemCloseBtn.addEventListener('click', () => {
+                telemWindow.classList.add('hidden');
+            });
+        }
+
+        function toggleTelemetryVisibility() {
+            if (telemWindow) {
+                telemWindow.classList.toggle('hidden');
+            }
+        }
+
+        if (btnToggleTelemetry) btnToggleTelemetry.addEventListener('click', toggleTelemetryVisibility);
+        if (simDockTelemetryBtn) simDockTelemetryBtn.addEventListener('click', toggleTelemetryVisibility);
+
+        if (telemCamToggle) {
+            telemCamToggle.addEventListener('click', () => {
+                autoFollowCamera = !autoFollowCamera;
+                if (autoFollowCamera) {
+                    telemCamToggle.classList.add('bg-cyan-500', 'text-slate-950');
+                    telemCamToggle.classList.remove('bg-slate-800', 'text-slate-300');
+                } else {
+                    telemCamToggle.classList.remove('bg-cyan-500', 'text-slate-950');
+                    telemCamToggle.classList.add('bg-slate-800', 'text-slate-300');
+                }
+            });
+
+            // Initialize Camera Follow Button State
+            telemCamToggle.classList.add('bg-cyan-500', 'text-slate-950');
+            telemCamToggle.classList.remove('bg-slate-800', 'text-slate-300');
+        }
+
+        // Window Resize Handling
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Main Animation Loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+
+            if (targetCamPos && targetLookAt) {
+                camera.position.lerp(targetCamPos, 0.08);
+                controls.target.lerp(targetLookAt, 0.08);
+                if (camera.position.distanceTo(targetCamPos) < 0.05) {
+                    targetCamPos = null;
+                    targetLookAt = null;
+                }
+            }
+            controls.update();
+
+            // Animate Bus Data Pulse Packets
+            pulsePackets.forEach(packet => {
+                if (packet.active) {
+                    packet.progress += packet.speed;
+                    if (packet.progress > 1.0) packet.progress = 0.0;
+                    const pos = packet.curve.getPointAt(packet.progress);
+                    packet.mesh.position.copy(pos);
+                }
+            });
+
+            // Gentle ambient float for architectural model
+            rootArchitectureGroup.position.y = Math.sin(elapsed * 0.7) * 0.1;
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function() {
+            animate();
+            // Start in Diagram (2D Front) view for immediate clarity
+            smoothMoveCamera(0, -0.4, 30, 0, -0.4, 0);
+        };
+    </script>
+</body>
+</html>

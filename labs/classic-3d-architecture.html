@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>8086 Internal Architecture — Interactive 3D Block Diagram</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:#0b1020;font-family:ui-sans-serif,system-ui,sans-serif}
+#view{touch-action:none;cursor:grab}#view:active{cursor:grabbing}
+</style>
+</head>
+<body class="text-slate-200">
+<div class="flex flex-col lg:flex-row min-h-screen">
+  <section class="relative lg:flex-1 h-[60vh] lg:h-screen lg:sticky lg:top-0" id="wrap">
+    <canvas id="view" class="w-full h-full block"></canvas>
+    <div class="absolute top-3 left-3 right-3 pointer-events-none">
+      <h1 class="text-xl font-bold text-white">8086 Internal Architecture</h1>
+      <p class="text-xs text-slate-400">Drag: rotate freely · Right-drag / Shift-drag / two fingers: pan · Scroll / pinch: zoom · Double-click: reset · Click a block</p>
+    </div>
+    <div class="absolute bottom-3 left-3 flex flex-wrap gap-2 text-xs">
+      <button id="bFront" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">Front view</button>
+      <button id="b3d" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">3D view</button>
+      <button id="bSpin" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">Auto-spin: off</button>
+      <button id="bReset" class="px-3 py-1.5 rounded bg-slate-800/90 hover:bg-slate-700">Reset</button>
+    </div>
+    <div id="tip" class="hidden fixed pointer-events-none z-20 px-2 py-1 rounded bg-black/80 text-xs"></div>
+    <div id="live" class="hidden absolute z-10 right-3 bottom-14 lg:bottom-3 w-[calc(100%-1.5rem)] sm:w-[370px] max-h-[42%] lg:max-h-[65%] overflow-auto rounded-xl border border-slate-600 bg-slate-900/92 backdrop-blur p-3 text-xs shadow-xl">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <div class="text-[10px] uppercase tracking-wide text-slate-400">Live detail · example: <span class="text-amber-300 font-semibold">ADD AX, BX</span> (bytes 01 D8)</div>
+          <div id="liveTitle" class="text-sm font-bold text-white"></div>
+        </div>
+        <button id="liveMin" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600" title="Collapse / expand">–</button>
+      </div>
+      <div id="liveBody" class="mt-2 space-y-2.5"></div>
+    </div>
+  </section>
+
+  <aside class="lg:w-[420px] bg-slate-900/80 border-l border-slate-800 p-4 space-y-4">
+    <div id="card" class="rounded-lg border border-slate-700 bg-slate-800/60 p-4 min-h-[150px]"></div>
+    <div class="rounded-lg border border-slate-700 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-semibold text-white">Walk through an instruction</h2>
+        <span id="stepNo" class="text-xs text-slate-400"></span>
+      </div>
+      <p id="stepTxt" class="text-sm text-slate-300 min-h-[64px]"></p>
+      <div class="flex gap-2 mt-2 text-xs">
+        <button id="sPrev" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700">◀ Prev</button>
+        <button id="sPlay" class="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white">▶ Play</button>
+        <button id="sNext" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700">Next ▶</button>
+        <button id="sReset" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700">Reset</button>
+      </div>
+    </div>
+    <div>
+      <h2 class="text-sm font-semibold mb-2">Filter by section</h2>
+      <div id="chips" class="flex flex-wrap gap-2 text-xs"></div>
+    </div>
+    <div>
+      <h2 class="text-sm font-semibold mb-2">All blocks</h2>
+      <div id="list" class="grid grid-cols-2 gap-1.5 text-xs"></div>
+    </div>
+    <div class="rounded-lg border border-slate-700 p-4 text-xs text-slate-300 space-y-1">
+      <h2 class="text-sm font-semibold text-white mb-1">Key ideas</h2>
+      <p>• The 8086 is split into two units that work in parallel: <b>BIU</b> (fetches) and <b>EU</b> (executes).</p>
+      <p>• Overlapping fetch and execute is <b>pipelining</b>; the 6-byte queue keeps the EU fed.</p>
+      <p>• Physical address (20-bit) = Segment × 10H + Offset → 1 MB address space.</p>
+      <p>• A jump or call flushes the queue because the prefetched bytes are no longer valid.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+const CAT={biu:['BIU registers & adder','#3b82f6'],bus:['Bus & queue','#a855f7'],ctl:['Control unit','#f59e0b'],gpr:['General-purpose registers','#22c55e'],ptr:['Pointer & index registers','#14b8a6'],alu:['ALU, operands & flags','#ef4444']};
+const IT={},order=[];
+const add=(id,cat,name,sub,desc,r,col,tc)=>{IT[id]={id,cat,name,sub,desc,r,col,tc:tc||'#111827',mats:[],labs:[]};order.push(id)};
+add('bus','bus','Bus interface (memory / I/O)','BIU ↔ outside world','Connects the 8086 to external memory and I/O over the multiplexed address/data bus (AD15–AD0, A19–A16). The BIU drives it for every code fetch and operand read/write.',[[-6.5,6.15,6.4,1.3,'To memory and\nInput/ Output']],0xbfdbfe);
+add('adder','biu','Address adder (Σ)','Physical address generator','Computes the 20-bit physical address: PA = Segment × 10H + Offset (the segment is shifted left 4 bits, then the 16-bit offset is added). This is how a 16-bit CPU addresses 1 MB.',[[-6.5,3.5,6.4,1.7,'Σ\nPA = Seg × 10H + offset']],0xfde68a);
+[['cs','CS — Code Segment','Segment register','Base of the current 64 KB code segment. With IP it gives the address of the next instruction. After reset CS:IP = FFFF:0000 → physical FFFF0h.'],
+ ['ss','SS — Stack Segment','Segment register','Base of the stack segment. With SP or BP it addresses the stack (PUSH, POP, CALL, RET).'],
+ ['ds','DS — Data Segment','Segment register','Default segment for most data accesses; combined with offsets held in BX, SI, DI or direct addresses.'],
+ ['es','ES — Extra Segment','Segment register','Extra data segment; the default destination for string instructions (ES:DI).'],
+ ['ip','IP — Instruction Pointer','Offset register','Offset of the next instruction within the code segment. Updated by the BIU and changed by jumps, calls and returns. Not directly writable with MOV.']]
+ .forEach(([id,n,s,d],i)=>add(id,'biu',n,s,d,[[-6.5,2.1-i*.8,6.4,.75,id.toUpperCase()]],0x86efac));
+add('queue','bus','6-byte prefetch queue','Instruction FIFO buffer','Holds up to 6 prefetched instruction bytes. The BIU fills it while the EU is busy executing, so the EU rarely waits for memory (pipelining). A jump or call flushes it. (The 8088 has a 4-byte queue.)',[6,5,4,3,2,1].map((n,i)=>[3,4.8-i*.85,2.6,.8,''+n]),0xe5e7eb);
+add('cu','ctl','Control unit','Instruction decoder & timing','Takes opcode bytes from the queue, decodes them and generates the control signals that direct the ALU, registers and BIU.',[[5.2,-1.3,6.4,1.2,'Control Unit']],0x0f766e,'#ffffff');
+[['ax','AX — Accumulator','AH : AL (16-bit or two 8-bit)','Primary register for arithmetic, logic and data transfer. Required by MUL/DIV and IN/OUT.',['AH','AL'],-3.1],
+ ['bx','BX — Base','BH : BL','Holds base addresses for memory access (e.g. [BX]); also usable as a general data register.',['BH','BL'],-3.9],
+ ['cx','CX — Count','CH : CL','Loop counter for LOOP, repeat counter for REP string instructions, and shift/rotate count in CL.',['CH','CL'],-4.7],
+ ['dx','DX — Data','DH : DL','Extends AX for 32-bit multiply/divide results; holds the port address for IN/OUT.',['DH','DL'],-5.5]]
+ .forEach(([id,n,s,d,l,y])=>add(id,'gpr',n,s,d,[[-8.075,y,3.15,.75,l[0]],[-4.925,y,3.15,.75,l[1]]],0xfcd9a8));
+[['sp','SP — Stack Pointer','Pointer register','Offset of the top of the stack within SS. PUSH decrements it by 2, POP increments it by 2.',-6.5],
+ ['bp','BP — Base Pointer','Pointer register','Offset into the stack segment, used to reach parameters and local variables in a stack frame.',-7.3],
+ ['si','SI — Source Index','Index register','Source offset for string operations (DS:SI) and indexed addressing.',-8.1],
+ ['di','DI — Destination Index','Index register','Destination offset for string operations (ES:DI) and indexed addressing.',-8.9]]
+ .forEach(([id,n,s,d,y])=>add(id,'ptr',n,s,d,[[-6.5,y,6.4,.75,id.toUpperCase()]],0xa7f3d0));
+add('alu','alu','ALU','16-bit arithmetic logic unit','Performs arithmetic (ADD, SUB, INC, CMP…), logic (AND, OR, XOR, NOT) and shifts/rotates on 8- or 16-bit operands. Its result updates the flag register.',[[4.6,-4.1,4.6,2.2,'ALU']],0x2563eb,'#ffffff');
+add('operands','alu','Operands','Temporary ALU registers','Internal temporary registers that hold the operands going into the ALU and intermediate results. Not visible to the programmer.',[[4.6,-6.4,4.4,.8,'Operands']],0xfdba74);
+add('flags','alu','Flags','Status & control flags','16-bit register with 9 active flags: status flags CF, PF, AF, ZF, SF, OF (set by the ALU) and control flags TF, IF, DF (set by the programmer).',[[4.6,-7.3,4.4,.8,'Flags']],0xfdba74);
+
+const B={CS:'2000h',IP:'0100h',PA:'—',Bus:'idle',Queue:'empty',Instr:'—',AX:'0005h',BX:'0003h',OP1:'—',OP2:'—',Result:'—',Flags:'—'};
+const STEPS=[
+['Address generation','The BIU adds the code segment (CS, shifted left 4 bits) to the instruction pointer (IP) in the adder to form a 20-bit physical address.',['cs','ip','adder','cH'],
+ {from:'CS and IP registers (BIU)',via:['Internal path to the Σ adder'],to:'Σ adder → 20-bit physical address (PA)',
+  how:['CS = 2000h is shifted left 4 bits → 20000h','Offset IP = 0100h is added → PA = 20100h','This is how 16-bit registers reach a 1 MB space'],
+  sig:'Adder output feeds the address latches (A19–A0). No external bus activity yet.',st:{...B,PA:'20100h'},chg:['PA']}],
+['Bus cycle','The BIU puts that address on the bus and reads the instruction byte(s) from memory.',['adder','cA','bus'],
+ {from:'Σ adder (physical address 20100h)',via:['Bus interface unit','Multiplexed bus AD15–AD0 + A19–A16','Control lines ALE, M/IO̅, RD̅'],to:'Memory location 20100h, data returns to the BIU',
+  how:['T1: address 20100h is placed on the bus; ALE latches it','T2: RD̅ goes low to read memory; T3/T4: data is sampled','Even address → one bus cycle returns both bytes: 01 (low) and D8 (high) = word D801h','BIU increments IP by 2 → 0102h'],
+  sig:'AD15–AD0 (address, then data), A19–A16, ALE, M/IO̅ = 1 (memory), RD̅ = 0.',st:{...B,PA:'20100h',Bus:'D801h',IP:'0102h'},chg:['Bus','IP']}],
+['Prefetch','Fetched bytes enter the 6-byte queue. The BIU keeps prefetching while the EU is busy; this is the pipeline.',['bus','cB','queue'],
+ {from:'Bus interface unit (data word D801h)',via:['Top bus from the bus interface','Queue input'],to:'6-byte prefetch queue (FIFO)',
+  how:['Bytes 01 then D8 are stored in the queue in order','While at least 2 bytes of queue space are free, the BIU keeps fetching the next words','The EU never talks to memory itself; it only reads from the queue (pipelining)'],
+  sig:'Internal queue-write path; the BIU competes for the bus only when the EU does not need it.',st:{...B,PA:'20100h',Bus:'D801h',IP:'0102h',Queue:'01 D8'},chg:['Queue']}],
+['Decode','The control unit takes the next opcode byte from the queue and decodes it.',['queue','cE','cu'],
+ {from:'Queue (oldest byte first)',via:['Queue → control unit path'],to:'Control unit (instruction decoder)',
+  how:['Opcode 01h = ADD r/m16, r16','ModR/M byte D8h = 11 011 000 → mod 11 (register), reg = BX, r/m = AX','So the instruction is ADD AX, BX','The control unit issues the micro-operations and timing for the EU'],
+  sig:'Bytes leave the queue; free slots let the BIU prefetch more.',st:{...B,PA:'20100h',Bus:'D801h',IP:'0102h',Queue:'consumed',Instr:'ADD AX, BX'},chg:['Instr','Queue']}],
+['Operand fetch','The needed registers put their operands on the internal bus; they are latched into the ALU operand registers.',['ax','bx','cx','dx','cD','cC','operands'],
+ {from:'AX (0005h) and BX (0003h) general registers',via:['General-register bus','Internal data bus','Operand latches'],to:'Operand registers (ALU inputs)',
+  how:['Control unit asserts the register-read signals','AX is copied to operand register 1, BX to operand register 2','Source registers keep their values for now'],
+  sig:'Internal 16-bit data bus (EU side); no external bus cycle needed.',st:{...B,PA:'20100h',Bus:'D801h',IP:'0102h',Queue:'consumed',Instr:'ADD AX, BX',OP1:'0005h',OP2:'0003h'},chg:['OP1','OP2']}],
+['Execute','Under control-unit direction the ALU performs the operation.',['cu','cF','alu','operands','cG'],
+ {from:'Control unit (function select) and operand registers',via:['Control unit → ALU control path','Operand registers → ALU inputs'],to:'ALU',
+  how:['Control unit selects the ADD function','ALU computes 0005h + 0003h = 0008h (16-bit add)','Carry, zero, sign, overflow, parity and aux-carry are evaluated'],
+  sig:'ALU function-select lines from the control unit; result held in a temporary register.',st:{...B,PA:'20100h',Bus:'D801h',IP:'0102h',Queue:'consumed',Instr:'ADD AX, BX',OP1:'0005h',OP2:'0003h',Result:'0008h'},chg:['Result']}],
+['Flags & write-back','Flags are updated from the result, and the result is written back to a register (or memory via the BIU).',['alu','cG','flags','cC','cD','ax'],
+ {from:'ALU result (0008h) and status outputs',via:['ALU output / temp register','Internal data bus','General-register bus'],to:'AX register and the Flag register',
+  how:['0008h is written back to AX','Flags: CF=0 (no carry), ZF=0 (non-zero), SF=0 (positive), OF=0 (no overflow), PF=0 (odd parity), AF=0','IP already points to the next instruction (0102h); the EU takes the next bytes from the queue'],
+  sig:'Write enable to AX; flag-latch signals from the ALU.',st:{...B,PA:'20100h',Bus:'D801h',IP:'0102h',Queue:'consumed',Instr:'ADD AX, BX',AX:'0008h',OP1:'0005h',OP2:'0003h',Result:'0008h',Flags:'C0 Z0 S0 O0 P0 A0'},chg:['AX','Flags']}]];
+
+let liveMin=window.innerWidth<1024;
+function renderLive(){
+  const el=document.getElementById('live');
+  if(step<0){el.classList.add('hidden');return}
+  el.classList.remove('hidden');
+  const d=STEPS[step][3];
+  document.getElementById('liveTitle').textContent='Step '+(step+1)+'/'+STEPS.length+' — '+STEPS[step][0];
+  const cells=Object.entries(d.st).map(([k,v])=>{const c=d.chg.includes(k);
+    return `<div class="rounded px-2 py-1 ${c?'bg-amber-400/20 border border-amber-400/60':'bg-slate-800/80 border border-transparent'}"><div class="text-[10px] text-slate-400">${k}</div><div class="font-mono text-slate-100 break-words">${v}</div></div>`}).join('');
+  const b=document.getElementById('liveBody');
+  b.innerHTML=`<div class="rounded-lg bg-slate-800/80 p-2 space-y-1">
+    <div><span class="text-emerald-400 font-semibold">FROM </span>${d.from}</div>
+    <div><span class="text-amber-300 font-semibold">VIA </span>${d.via.join(' <span class="text-slate-500">→</span> ')}</div>
+    <div><span class="text-sky-400 font-semibold">TO </span>${d.to}</div></div>
+    <div><div class="text-[10px] uppercase tracking-wide text-slate-400 mb-1">How it works</div><ul class="list-disc pl-4 space-y-0.5 text-slate-200">${d.how.map(h=>'<li>'+h+'</li>').join('')}</ul></div>
+    <div><div class="text-[10px] uppercase tracking-wide text-slate-400 mb-1">Signals / buses</div><p class="text-slate-300">${d.sig}</p></div>
+    <div><div class="text-[10px] uppercase tracking-wide text-slate-400 mb-1">Machine state <span class="normal-case text-amber-300">(changed = highlighted)</span></div><div class="grid grid-cols-3 gap-1">${cells}</div></div>`;
+  b.style.display=liveMin?'none':'';
+}
+document.addEventListener('DOMContentLoaded',()=>{});
+
+/* ---------- three.js ---------- */
+const cv=document.getElementById('view'),wrap=document.getElementById('wrap');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));
+const S=new THREE.Scene();S.background=new THREE.Color(0x0b1020);
+const cam=new THREE.PerspectiveCamera(40,1,.1,200);cam.position.set(0,0,28);
+S.add(new THREE.AmbientLight(0xffffff,.8));
+const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(5,10,15);S.add(dl);
+const dl2=new THREE.DirectionalLight(0x88aaff,.4);dl2.position.set(-8,-6,-10);S.add(dl2);
+const G=new THREE.Group();S.add(G);const D=new THREE.Group();D.position.set(.2,1.15,0);G.add(D);
+const hit=[],conns={},packets=[];
+
+function tex(t,w,h,col){const c=document.createElement('canvas');c.width=Math.round(w*90);c.height=Math.round(h*90);const x=c.getContext('2d');
+  const L=t.split('\n'),mx=Math.max(...L.map(s=>s.length)),fs=Math.min(h*90/(L.length*1.25),(w*90*.92)/(mx*.56),44);
+  x.font='bold '+fs+'px sans-serif';x.fillStyle=col;x.textAlign='center';x.textBaseline='middle';
+  L.forEach((s,i)=>x.fillText(s,c.width/2,c.height/2+(i-(L.length-1)/2)*fs*1.22));return new THREE.CanvasTexture(c)}
+function lab(t,w,h,x,y,z,col){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex(t,w,h,col),transparent:true,depthWrite:false}));m.position.set(x,y,z);D.add(m);return m}
+function region(x0,y0,x1,y1,col){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(x1-x0,y0-y1,.1),new THREE.MeshStandardMaterial({color:col,transparent:true,opacity:.28}));
+  m.position.set((x0+x1)/2,(y0+y1)/2,-.5);D.add(m);
+  const g=new THREE.BufferGeometry().setFromPoints([[x0,y0],[x1,y0],[x1,y1],[x0,y1],[x0,y0]].map(p=>new THREE.Vector3(p[0],p[1],-.4)));
+  const l=new THREE.Line(g,new THREE.LineDashedMaterial({color:0x94a3b8,dashSize:.35,gapSize:.2}));l.computeLineDistances();D.add(l)}
+region(-10.6,7.4,10.2,-2.0,0x1e3a8a);region(-10.6,-2.4,10.2,-9.7,0x14532d);
+lab('BIU',.9,.6,-10.15,6.75,-.35,'#93c5fd');lab('EU',.9,.6,-10.15,-2.95,-.35,'#86efac');
+
+order.forEach(id=>{const it=IT[id];
+  it.r.forEach(([x,y,w,h,t])=>{
+    let g;
+    if(id==='alu'){const sh=new THREE.Shape();[[-2.3,1.1],[-.5,1.1],[0,.55],[.5,1.1],[2.3,1.1],[1.1,-1.1],[-1.1,-1.1]].forEach((p,i)=>i?sh.lineTo(p[0],p[1]):sh.moveTo(p[0],p[1]));g=new THREE.ExtrudeGeometry(sh,{depth:.6,bevelEnabled:false});g.translate(0,0,-.3)}
+    else g=new THREE.BoxGeometry(w,h,.6);
+    const m=new THREE.MeshStandardMaterial({color:it.col,roughness:.55,metalness:.1});it.mats.push(m);
+    const me=new THREE.Mesh(g,m);me.position.set(x,y,0);me.userData.id=id;D.add(me);hit.push(me);
+    it.labs.push(lab(t,id==='alu'?2:w-.1,id==='alu'?.9:h-.05,x,id==='alu'?y-.1:y,.32,it.tc))});
+});
+[['AX',-3.1],['BX',-3.9],['CX',-4.7],['DX',-5.5]].forEach(([t,y])=>lab(t,1,.6,-2.75,y,.1,'#fcd9a8'));
+lab('General\nPurpose\nRegisters',2.4,1.8,-0.9,-6.5,.1,'#cbd5e1');
+lab('6-Byte\npre-fetch\nqueue',3.2,1.8,7.4,2.6,.1,'#cbd5e1');
+
+/* arrows / buses */
+const UP=new THREE.Vector3(0,1,0);
+function conn(key,pts,hs,he,hl=.5,hr=.28){
+  const grp=new THREE.Group();D.add(grp);
+  const mat=new THREE.MeshStandardMaterial({color:0x94a3b8,roughness:.4,metalness:.3});
+  const P=pts.map(p=>new THREE.Vector3(p[0],p[1],0)),n=P.length;
+  for(let i=0;i<n-1;i++){const a=P[i].clone(),b=P[i+1].clone(),d=b.clone().sub(a).normalize();
+    if(i===0&&hs)a.add(d.clone().multiplyScalar(hl*.9));
+    if(i===n-2&&he)b.sub(d.clone().multiplyScalar(hl*.9));
+    const L=a.distanceTo(b);if(L<.01)continue;
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,L,10),mat);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(UP,b.clone().sub(a).normalize());grp.add(m)}
+  const head=(tip,dir)=>{const m=new THREE.Mesh(new THREE.ConeGeometry(hr,hl,14),mat);m.position.copy(tip).sub(dir.clone().multiplyScalar(hl/2));m.quaternion.setFromUnitVectors(UP,dir);grp.add(m)};
+  if(he)head(P[n-1],P[n-1].clone().sub(P[n-2]).normalize());
+  if(hs)head(P[0],P[0].clone().sub(P[1]).normalize());
+  let len=0;for(let i=0;i<n-1;i++)len+=P[i].distanceTo(P[i+1]);
+  const pk=new THREE.Mesh(new THREE.SphereGeometry(.2,14,14),new THREE.MeshBasicMaterial({color:0xfacc15}));pk.visible=false;D.add(pk);
+  conns[key]={mat,P,len,pk};
+}
+conn('cA',[[-6.5,5.5],[-6.5,4.35]],1,1,.4,.22);                 // memory <-> adder
+conn('cB',[[-3.3,6.15],[3,6.15],[3,5.2]],1,1,.5,.28);          // memory/IO bus -> queue
+conn('cC',[[.8,6.15],[.8,-4.3],[3.0,-4.3]],0,1,.5,.28);        // internal bus -> ALU
+conn('cD',[[-3.3,-4.3],[.8,-4.3]],1,1,.45,.25);                // general regs <-> internal bus
+conn('cE',[[3,.15],[3,-.7]],0,1,.4,.25);                       // queue -> control unit
+conn('cF',[[5.6,-1.9],[5.6,-3.0]],0,1,.45,.26);                // control unit -> ALU
+conn('cG',[[4.6,-5.2],[4.6,-6.0]],1,1,.3,.2);                  // ALU <-> operands
+conn('cH',[[-3.3,3.5],[.8,3.5]],1,1,.45,.25);                  // adder <-> internal bus
+[[.8,6.15],[.8,-4.3]].forEach(([x,y])=>{const j=new THREE.Mesh(new THREE.SphereGeometry(.18,14,14),new THREE.MeshStandardMaterial({color:0x94a3b8}));j.position.set(x,y,0);D.add(j)});
+[[.8,3.5]].forEach(([x,y])=>{const j=new THREE.Mesh(new THREE.SphereGeometry(.16,14,14),new THREE.MeshStandardMaterial({color:0x94a3b8}));j.position.set(x,y,0);D.add(j)});
+function pathAt(c,s){let d=s%c.len;for(let i=0;i<c.P.length-1;i++){const L=c.P[i].distanceTo(c.P[i+1]);if(d<=L)return c.P[i].clone().lerp(c.P[i+1],d/L);d-=L}return c.P[c.P.length-1]}
+
+/* state & per-frame update */
+let filter='all',sel=null,hov=null,step=-1,spin=false,timer=null;
+const A0=new Set();
+function update(t){
+  const A=step>=0?new Set(STEPS[step][2]):A0;
+  order.forEach(id=>{const it=IT[id],dim=filter!=='all'&&it.cat!==filter,a=A.has(id),on=sel===id,h=hov===id;
+    it.mats.forEach(m=>{m.color.set(dim?0x2a3040:it.col);
+      m.emissive.set(a?0xfacc15:0x3b82f6);m.emissiveIntensity=dim?0:a?.45+.3*Math.sin(t*5):on?.7:h?.4:0});
+    it.labs.forEach(l=>l.material.opacity=dim?.25:1)});
+  for(const k in conns){const c=conns[k],a=A.has(k);c.mat.color.set(a?0xfacc15:0x94a3b8);c.mat.emissive.set(a?0xfacc15:0);c.mat.emissiveIntensity=a?.5:0;
+    c.pk.visible=a;if(a)c.pk.position.copy(pathAt(c,t*4))}
+}
+
+/* ---------- free trackball controls ---------- */
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const q0=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.3,.4,0));
+G.quaternion.copy(q0);
+let tq=q0.clone(),tpos=V(0,0,0),tz=28,anim=false,vx=0,vy=0,lastMove=0,downBtn=0,moved=0,drag=false;
+const ptrs=new Map();
+function rotateBy(dx,dy){const qy=new THREE.Quaternion().setFromAxisAngle(V(0,1,0),dx*.008),qx=new THREE.Quaternion().setFromAxisAngle(V(1,0,0),dy*.008);G.quaternion.premultiply(qy).premultiply(qx).normalize()}
+function panBy(dx,dy){const s=2*cam.position.z*Math.tan(20*Math.PI/180)/cv.clientHeight;G.position.x+=dx*s;G.position.y-=dy*s}
+const zoomBy=f=>{cam.position.z=Math.min(70,Math.max(6,cam.position.z*f));tz=cam.position.z};
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('pointerdown',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});cv.setPointerCapture(e.pointerId);drag=true;anim=false;vx=vy=0;downBtn=e.button;if(ptrs.size===1)moved=0;tip(null)});
+cv.addEventListener('pointermove',e=>{
+  const p=ptrs.get(e.pointerId);
+  if(!p){const id=pick(e);if(id!==hov){hov=id;cv.style.cursor=id?'pointer':'grab'}tip(id,e);return}
+  const ox=p.x,oy=p.y;p.x=e.clientX;p.y=e.clientY;const dx=p.x-ox,dy=p.y-oy;moved+=Math.abs(dx)+Math.abs(dy);
+  if(ptrs.size>=2){const o=[...ptrs.values()].find(q=>q!==p);const d0=Math.hypot(ox-o.x,oy-o.y),d1=Math.hypot(p.x-o.x,p.y-o.y);if(d1>0)zoomBy(d0/d1);panBy(dx/2,dy/2)}
+  else if(downBtn===2||downBtn===1||e.shiftKey)panBy(dx,dy);
+  else{rotateBy(dx,dy);vx=dx;vy=dy;lastMove=performance.now()}
+});
+function endPtr(e){const had=ptrs.size===1&&ptrs.has(e.pointerId);ptrs.delete(e.pointerId);if(!ptrs.size){drag=false;if(performance.now()-lastMove>80)vx=vy=0;
+  if(had&&moved<5&&downBtn===0){const id=pick(e);if(id)select(id)}}}
+cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
+cv.addEventListener('pointerleave',e=>{if(!ptrs.size){hov=null;tip(null)}});
+cv.addEventListener('wheel',e=>{e.preventDefault();anim=false;zoomBy(Math.exp(e.deltaY*.0012))},{passive:false});
+cv.addEventListener('dblclick',()=>resetView());
+const rc=new THREE.Raycaster(),mv=new THREE.Vector2();
+function pick(e){const r=cv.getBoundingClientRect();mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);rc.setFromCamera(mv,cam);const h=rc.intersectObjects(hit,false)[0];return h?h.object.userData.id:null}
+const tipEl=document.getElementById('tip');
+function tip(id,e){if(!id){tipEl.classList.add('hidden');return}tipEl.textContent=IT[id].name;tipEl.style.left=(e.clientX+14)+'px';tipEl.style.top=(e.clientY+14)+'px';tipEl.classList.remove('hidden')}
+function fitZ(){return Math.max(26,22.5/(2*Math.tan(20*Math.PI/180)*cam.aspect))}
+function size(){const w=wrap.clientWidth,h=wrap.clientHeight;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();if(!window._init){cam.position.z=tz=fitZ();window._init=1}}
+function view(q){tq=q.clone();tpos=V(0,0,0);tz=fitZ();anim=true;vx=vy=0}
+function resetView(){spin=false;$('bSpin').textContent='Auto-spin: off';view(q0)}
+addEventListener('resize',size);size();
+(function loop(ts){requestAnimationFrame(loop);const t=ts/1000;
+  if(anim){G.quaternion.slerp(tq,.12);G.position.lerp(tpos,.12);cam.position.z+=(tz-cam.position.z)*.12;
+    if(G.quaternion.angleTo(tq)<.003&&G.position.distanceTo(tpos)<.01&&Math.abs(tz-cam.position.z)<.05)anim=false}
+  else if(!drag){if(spin)rotateBy(1.4,0);else if(Math.abs(vx)>.03||Math.abs(vy)>.03){rotateBy(vx,vy);vx*=.93;vy*=.93}}
+  update(t);R.render(S,cam)})(0);
+
+/* ---------- UI ---------- */
+function $(id){return document.getElementById(id)}
+function card(){
+  const el=$('card');
+  if(!sel){el.innerHTML='<p class="text-slate-400 text-sm">Click any block in the 3D diagram (or choose from the list) to see what it does.</p>';return}
+  const p=IT[sel],c=CAT[p.cat][1];
+  el.innerHTML=`<div class="flex items-center gap-3"><div class="w-3 h-12 rounded" style="background:${c}"></div>
+  <div><div class="text-xl font-bold text-white">${p.name}</div><div class="text-xs"><span style="color:${c}">${CAT[p.cat][0]}</span> · ${p.sub}</div></div></div>
+  <p class="text-sm mt-3 text-slate-300">${p.desc}</p>`;
+}
+function select(id){sel=id;card();buildList()}
+function buildList(){
+  $('list').innerHTML='';
+  order.forEach(id=>{const p=IT[id],dim=filter!=='all'&&p.cat!==filter;
+    const b=document.createElement('button');
+    b.className='flex items-center gap-2 px-2 py-1.5 rounded text-left border '+(sel===id?'border-white bg-slate-700':'border-slate-800 bg-slate-800/50 hover:bg-slate-800')+(dim?' opacity-30':'');
+    b.innerHTML=`<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${CAT[p.cat][1]}"></span><span class="truncate">${p.name}</span>`;
+    b.onclick=()=>select(id);$('list').appendChild(b)});
+}
+function buildChips(){
+  const defs=[['all','All','#94a3b8'],...Object.entries(CAT).map(([k,v])=>[k,v[0],v[1]])];
+  $('chips').innerHTML='';
+  defs.forEach(([k,l,c])=>{const b=document.createElement('button');
+    b.className='px-2.5 py-1 rounded-full border '+(filter===k?'bg-slate-700 border-white':'border-slate-700 hover:bg-slate-800');
+    b.innerHTML=`<span class="inline-block w-2 h-2 rounded-full mr-1.5" style="background:${c}"></span>${l}`;
+    b.onclick=()=>{filter=k;buildChips();buildList()};$('chips').appendChild(b)});
+}
+function showStep(){renderLive();
+  if(step<0){$('stepNo').textContent='';$('stepTxt').textContent='Press Play (or Next) to follow the example instruction ADD AX, BX (bytes 01 D8) through the BIU and EU. Active blocks glow, data packets travel along the buses, and a live detail window shows from where, through which path, and how.';$('sPlay').textContent='▶ Play';return}
+  $('stepNo').textContent='Step '+(step+1)+' / '+STEPS.length;
+  $('stepTxt').innerHTML='<b class="text-white">'+STEPS[step][0]+'.</b> '+STEPS[step][1];
+}
+function stop(){clearInterval(timer);timer=null;$('sPlay').textContent='▶ Play'}
+function go(n){step=Math.max(-1,Math.min(STEPS.length-1,n));showStep()}
+$('sNext').onclick=()=>{stop();go(step>=STEPS.length-1?0:step+1)};
+$('sPrev').onclick=()=>{stop();go(step<=0?STEPS.length-1:step-1)};
+$('sReset').onclick=()=>{stop();go(-1)};
+$('sPlay').onclick=()=>{if(timer){stop();return}$('sPlay').textContent='❚❚ Pause';if(step>=STEPS.length-1||step<0)go(0);
+  timer=setInterval(()=>{if(step>=STEPS.length-1){stop();return}go(step+1)},2400)};
+$('bFront').onclick=()=>{spin=false;$('bSpin').textContent='Auto-spin: off';view(new THREE.Quaternion())};
+$('b3d').onclick=()=>{spin=false;$('bSpin').textContent='Auto-spin: off';view(q0)};
+$('bSpin').onclick=()=>{spin=!spin;anim=false;$('bSpin').textContent='Auto-spin: '+(spin?'on':'off')};
+$('bReset').onclick=resetView;
+document.getElementById('liveMin').textContent=liveMin?'+':'–';
+document.getElementById('liveMin').onclick=()=>{liveMin=!liveMin;document.getElementById('liveMin').textContent=liveMin?'+':'–';renderLive()};
+buildChips();card();buildList();showStep();
+</script>
+</body>
+</html>

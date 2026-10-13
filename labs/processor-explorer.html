@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intel 8086 3D Microprocessor Explorer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#080c14',
+                            card: '#0f172a',
+                            border: '#1e293b',
+                            accent: '#06b6d4',
+                            gold: '#f59e0b',
+                            rose: '#f43f5e',
+                            purple: '#a855f7'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            background-color: #080c14;
+            color: #f8fafc;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06b6d4;
+        }
+
+        /* Glowing animation effects */
+        .glow-accent {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+        }
+        .glow-gold {
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+        }
+        .glow-rose {
+            box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+        }
+
+        /* Subtle grid background */
+        .bg-grid-pattern {
+            background-image: radial-gradient(rgba(51, 65, 85, 0.3) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Glassmorphism style */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-grid-pattern antialiased selection:bg-cyan-500 selection:text-white">
+
+    <!-- TOP NAVIGATION HEADER -->
+    <header class="h-16 border-b border-slate-800 glass-panel sticky top-0 z-40 flex items-center justify-between px-4 lg:px-6">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-xl shadow-inner">
+                <i class="fa-solid font-mono">8086</i>
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-bold tracking-wide text-white flex items-center gap-2">
+                    INTEL 8086 <span class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 uppercase font-mono">3D Explorer</span>
+                </h1>
+                <p class="text-xs text-slate-400 hidden sm:block">16-Bit Architecture & DIP-40 Interactive Pinout</p>
+            </div>
+        </div>
+
+        <!-- Mode Switcher & Global Controls -->
+        <div class="flex items-center space-x-2 sm:space-x-4">
+            <!-- Mode Toggle Switch (Min/Max Mode) -->
+            <div class="flex items-center bg-slate-900/90 border border-slate-700/80 rounded-full p-1 shadow-md">
+                <button id="btnMinMode" onclick="setMode('MIN')" class="px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 bg-cyan-500 text-slate-950 font-mono shadow">
+                    MIN MODE
+                </button>
+                <button id="btnMaxMode" onclick="setMode('MAX')" class="px-3 py-1 rounded-full text-xs font-semibold text-slate-400 hover:text-white transition-all duration-200 font-mono">
+                    MAX MODE
+                </button>
+            </div>
+
+            <!-- Modals & Simulator Buttons -->
+            <button onclick="openSimulatorModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center space-x-1.5 transition">
+                <i class="fa-solid fa-play text-cyan-400"></i>
+                <span class="hidden md:inline">Bus Simulator</span>
+            </button>
+            <button onclick="openArchModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center space-x-1.5 transition">
+                <i class="fa-solid fa-microchip text-amber-400"></i>
+                <span class="hidden md:inline">Architecture & Registers</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN INTERFACE BODY -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+        <!-- LEFT PANEL: Pin List & Filters -->
+        <aside class="w-full lg:w-80 border-r border-slate-800 glass-panel flex flex-col z-20 h-60 lg:h-auto">
+            <!-- Search & Filter Bar -->
+            <div class="p-3 border-b border-slate-800/80 space-y-2">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+                    <input type="text" id="pinSearch" placeholder="Search pin #, name, or function..." oninput="filterPins()" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+                </div>
+                <!-- Category Badges -->
+                <div class="flex flex-wrap gap-1.5 pt-1" id="categoryFilterContainer">
+                    <button onclick="setCategoryFilter('ALL')" class="cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">All (40)</button>
+                    <button onclick="setCategoryFilter('Power')" class="cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500">Power/GND</button>
+                    <button onclick="setCategoryFilter('Address/Data')" class="cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500">Address/Data</button>
+                    <button onclick="setCategoryFilter('Control')" class="cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500">Control</button>
+                    <button onclick="setCategoryFilter('Interrupt')" class="cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500">Interrupts</button>
+                    <button onclick="setCategoryFilter('Dual')" class="cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500">Min/Max Dual</button>
+                </div>
+            </div>
+
+            <!-- Scrollable 40 Pin List -->
+            <div id="pinList" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- Pin items injected via JS -->
+            </div>
+        </aside>
+
+        <!-- CENTER AREA: 3D Canvas Viewport -->
+        <main class="flex-1 relative flex flex-col bg-slate-950 overflow-hidden">
+            <!-- 3D Viewport Controls Overlay -->
+            <div class="absolute top-4 left-4 z-10 flex flex-wrap gap-2">
+                <button onclick="resetCamera()" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 text-xs font-medium text-slate-200 hover:text-cyan-400 shadow backdrop-blur transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrows-to-center"></i> Reset View
+                </button>
+                <button id="toggleRotateBtn" onclick="toggleAutoRotate()" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 text-xs font-medium text-slate-200 hover:text-cyan-400 shadow backdrop-blur transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate"></i> Auto-Rotate
+                </button>
+                <button id="toggleWireframeBtn" onclick="toggleWireframe()" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 text-xs font-medium text-slate-200 hover:text-cyan-400 shadow backdrop-blur transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-border-all"></i> Wireframe
+                </button>
+                <button id="toggleExplodeBtn" onclick="toggleExplodeView()" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700 text-xs font-medium text-slate-200 hover:text-cyan-400 shadow backdrop-blur transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-up-down-left-right"></i> Pin Spread
+                </button>
+            </div>
+
+            <!-- Live Active Mode Badge Overlay -->
+            <div class="absolute top-4 right-4 z-10">
+                <div id="modeStatusBadge" class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 backdrop-blur shadow flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <span>MINIMUM MODE ACTIVE</span>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div id="canvasContainer" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+            <!-- 3D Tooltip Hover Indicator -->
+            <div id="hoverTooltip" class="absolute pointer-events-none hidden z-30 px-3 py-1.5 rounded-lg bg-slate-900/95 text-slate-100 text-xs border border-cyan-500/50 shadow-xl backdrop-blur font-mono flex items-center gap-2 transform -translate-x-1/2 -translate-y-full mb-2">
+                <span id="hoverPinNum" class="font-bold text-cyan-400">Pin 1</span>
+                <span id="hoverPinName" class="text-slate-300">Vss</span>
+            </div>
+
+            <!-- Canvas Bottom Navigation / Hint -->
+            <div class="absolute bottom-4 left-4 right-4 z-10 pointer-events-none flex justify-between items-end">
+                <div class="text-[11px] text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur pointer-events-auto">
+                    <i class="fa-solid fa-hand-pointer text-cyan-400 mr-1"></i> Left-Click / Tap pins to inspect details • Orbit: Drag mouse • Zoom: Scroll
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT PANEL: Pin Details Inspector -->
+        <aside class="w-full lg:w-96 border-l border-slate-800 glass-panel flex flex-col z-20 h-72 lg:h-auto overflow-y-auto">
+            <div id="inspectorDefault" class="p-6 text-center text-slate-400 flex flex-col items-center justify-center my-auto">
+                <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mb-3 text-cyan-400 text-2xl">
+                    <i class="fa-solid fa-microchip"></i>
+                </div>
+                <h3 class="text-sm font-semibold text-slate-200">No Pin Selected</h3>
+                <p class="text-xs text-slate-400 mt-1 max-w-xs">Select any pin on the 3D chip or from the left list to inspect detailed electrical specs, signal directions, and mode functions.</p>
+            </div>
+
+            <!-- Pin Inspector Active Container -->
+            <div id="inspectorActive" class="p-5 space-y-4 hidden">
+                <!-- Header Card -->
+                <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span id="pinNumBadge" class="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+                            PIN 1
+                        </span>
+                        <span id="pinCategoryBadge" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-medium">
+                            Power / GND
+                        </span>
+                    </div>
+
+                    <div class="pt-1">
+                        <h2 id="pinTitle" class="text-xl font-bold text-white font-mono flex items-center gap-2">
+                            Vss
+                        </h2>
+                        <p id="pinDirection" class="text-xs text-slate-400 flex items-center gap-1.5 mt-1 font-mono">
+                            <i class="fa-solid fa-arrow-right-left text-cyan-400"></i> Signal Direction: <span class="text-slate-200 font-semibold">Ground</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Dual Mode Status Banner (if dual function) -->
+                <div id="dualModeBanner" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1">
+                    <div class="flex items-center justify-between text-xs font-semibold text-rose-300">
+                        <span><i class="fa-solid fa-sliders mr-1"></i> Dual-Function Pin</span>
+                        <span class="font-mono text-[10px] uppercase">Min / Max Mode</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
+                        <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                            <span class="block text-[10px] text-slate-400 uppercase">Min Mode</span>
+                            <span id="dualMinName" class="font-mono font-bold text-cyan-400">ALE</span>
+                        </div>
+                        <div class="p-2 rounded bg-slate-900/80 border border-slate-800">
+                            <span class="block text-[10px] text-slate-400 uppercase">Max Mode</span>
+                            <span id="dualMaxName" class="font-mono font-bold text-rose-400">QS0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Primary Description -->
+                <div class="space-y-1.5">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Functional Summary</h4>
+                    <p id="pinDesc" class="text-xs text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                        Ground reference pin for system power.
+                    </p>
+                </div>
+
+                <!-- Detailed Specs & Behavior -->
+                <div class="space-y-1.5">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Timing & Signal Details</h4>
+                    <div id="pinDetails" class="text-xs text-slate-300 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-800 space-y-2">
+                        Must be tied to system ground (0V).
+                    </div>
+                </div>
+
+                <!-- Related Bus Connections -->
+                <div class="space-y-1.5">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Related Pins</h4>
+                    <div id="relatedPinsContainer" class="flex flex-wrap gap-1.5">
+                        <!-- Related pin buttons injected via JS -->
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- MODAL 1: BUS CYCLE SIMULATOR -->
+    <div id="simulatorModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-play text-cyan-400 text-lg"></i>
+                    <h3 class="text-base font-bold text-white">8086 Bus Cycle Signal Simulator</h3>
+                </div>
+                <button onclick="closeSimulatorModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-5 overflow-y-auto space-y-5 flex-1">
+                <!-- Select Simulation Preset -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button onclick="selectSimPreset('MEM_READ')" id="presetMemRead" class="sim-preset-btn p-3 rounded-xl border border-cyan-500 bg-cyan-500/10 text-left transition">
+                        <div class="text-xs font-bold text-cyan-400 font-mono">MEMORY READ</div>
+                        <div class="text-[11px] text-slate-400 mt-1">Fetches instruction/data byte from RAM (T1-T4)</div>
+                    </button>
+                    <button onclick="selectSimPreset('MEM_WRITE')" id="presetMemWrite" class="sim-preset-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-left hover:border-slate-700 transition">
+                        <div class="text-xs font-bold text-slate-200 font-mono">MEMORY WRITE</div>
+                        <div class="text-[11px] text-slate-400 mt-1">Outputs data to RAM address with /WR strobe</div>
+                    </button>
+                    <button onclick="selectSimPreset('INT_ACK')" id="presetIntAck" class="sim-preset-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-left hover:border-slate-700 transition">
+                        <div class="text-xs font-bold text-slate-200 font-mono">INTERRUPT ACK</div>
+                        <div class="text-[11px] text-slate-400 mt-1">Dual /INTA pulses to fetch 8-bit vector</div>
+                    </button>
+                </div>
+
+                <!-- Timeline / T-State Stepper -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Clock Cycle Timing (T-States)</span>
+                        <span id="simStepLabel" class="text-xs font-mono font-bold text-cyan-400">State T1: Address Generation</span>
+                    </div>
+
+                    <!-- Progress Stepper Bars -->
+                    <div class="grid grid-cols-4 gap-2">
+                        <div id="tStep1" class="h-2 rounded bg-cyan-500 transition-all duration-300"></div>
+                        <div id="tStep2" class="h-2 rounded bg-slate-800 transition-all duration-300"></div>
+                        <div id="tStep3" class="h-2 rounded bg-slate-800 transition-all duration-300"></div>
+                        <div id="tStep4" class="h-2 rounded bg-slate-800 transition-all duration-300"></div>
+                    </div>
+
+                    <!-- Step Detailed Explanation -->
+                    <div id="simStepDesc" class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed">
+                        T1: Processor outputs 20-bit address on AD0-AD15 & A16-A19. ALE pulses HIGH to latch memory address in external latches (8282).
+                    </div>
+                </div>
+
+                <!-- Active Signal Pins Visualization List -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Active Signal Lines in Current T-State</h4>
+                    <div id="simActivePinsList" class="flex flex-wrap gap-2">
+                        <!-- Injected active pin badges -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer Controls -->
+            <div class="p-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <button onclick="prevSimStep()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+                        <i class="fa-solid fa-backward mr-1"></i> Prev Step
+                    </button>
+                    <button onclick="nextSimStep()" class="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition">
+                        Next Step <i class="fa-solid fa-forward ml-1"></i>
+                    </button>
+                </div>
+                <button onclick="toggleSimAutoPlay()" id="simAutoPlayBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs font-medium transition">
+                    <i class="fa-solid fa-play mr-1"></i> Auto-Play
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ARCHITECTURE & REGISTERS & 20-BIT ADDRESS CALCULATOR -->
+    <div id="archModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            <!-- Header -->
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-microchip text-amber-400 text-lg"></i>
+                    <h3 class="text-base font-bold text-white">8086 Internal Architecture & Registers</h3>
+                </div>
+                <button onclick="closeArchModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="flex border-b border-slate-800 bg-slate-950 px-4 pt-2 space-x-4 text-xs font-semibold">
+                <button onclick="switchArchTab('calc')" id="tabBtnCalc" class="pb-2 border-b-2 border-cyan-400 text-cyan-400 transition">20-Bit Physical Address Calculator</button>
+                <button onclick="switchArchTab('biu_eu')" id="tabBtnBiu" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">BIU vs EU Architecture</button>
+                <button onclick="switchArchTab('regs')" id="tabBtnRegs" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">Register Map</button>
+            </div>
+
+            <!-- Modal Tab Content Area -->
+            <div class="p-5 overflow-y-auto space-y-5 flex-1">
+
+                <!-- TAB 1: 20-Bit Physical Address Calculator -->
+                <div id="archTabCalc" class="space-y-5">
+                    <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
+                        <div class="text-xs text-slate-300 leading-relaxed">
+                            The 8086 features a 20-bit address bus giving access to <span class="text-cyan-400 font-bold">1 Megabyte (1,048,576 bytes)</span> of physical memory space. Because internal registers are 16 bits wide, memory is calculated using a <span class="text-amber-400 font-bold">Segment:Offset</span> formula:
+                            <div class="mt-2 font-mono text-cyan-300 bg-slate-900 p-2 rounded text-center border border-slate-800 text-sm">
+                                Physical Address = (Segment Register × 16) + Offset Register
+                            </div>
+                        </div>
+
+                        <!-- Calculator Controls -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <!-- Segment Input -->
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-bold text-slate-300 flex justify-between">
+                                    <span>Segment Register (16-Bit Hex)</span>
+                                    <span class="text-slate-400 font-normal">e.g. CS, DS, SS, ES</span>
+                                </label>
+                                <input type="text" id="calcSegInput" value="1000" maxlength="4" oninput="calculateAddress()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-cyan-400 font-mono font-bold focus:outline-none focus:border-cyan-500">
+                            </div>
+
+                            <!-- Offset Input -->
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-bold text-slate-300 flex justify-between">
+                                    <span>Offset Register (16-Bit Hex)</span>
+                                    <span class="text-slate-400 font-normal">e.g. IP, SI, DI, SP, BP</span>
+                                </label>
+                                <input type="text" id="calcOffInput" value="0200" maxlength="4" oninput="calculateAddress()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-400 font-mono font-bold focus:outline-none focus:border-cyan-500">
+                            </div>
+                        </div>
+
+                        <!-- Calculation Breakdown Table -->
+                        <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 font-mono space-y-2 text-xs">
+                            <div class="flex justify-between items-center text-slate-400 pb-1 border-b border-slate-800">
+                                <span>Segment (Shifted Left 4-Bits / x16):</span>
+                                <span id="calcShiftedSeg" class="text-cyan-400 font-bold">10000 H</span>
+                            </div>
+                            <div class="flex justify-between items-center text-slate-400 pb-1 border-b border-slate-800">
+                                <span>+ Offset Value:</span>
+                                <span id="calcOffDisplay" class="text-amber-400 font-bold">00200 H</span>
+                            </div>
+                            <div class="flex justify-between items-center text-white pt-1 text-sm font-bold">
+                                <span class="text-slate-200">20-Bit Physical Address:</span>
+                                <span id="calcResultHex" class="text-emerald-400 font-extrabold text-base">10200 H</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 pt-1 text-right">
+                                Binary: <span id="calcResultBin" class="text-slate-300">0001 0000 0010 0000 0000</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: BIU vs EU Architecture -->
+                <div id="archTabBiu" class="hidden space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- BIU Card -->
+                        <div class="p-4 rounded-xl bg-slate-950 border border-cyan-500/30 space-y-2">
+                            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                                <h4 class="font-bold text-cyan-400 text-sm">Bus Interface Unit (BIU)</h4>
+                                <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded font-mono">External Bus Ops</span>
+                            </div>
+                            <ul class="text-xs text-slate-300 space-y-2 list-disc pl-4">
+                                <li>Handles all instruction fetching, memory read/write, and I/O bus operations.</li>
+                                <li>Contains the <strong class="text-cyan-300">6-Byte Instruction Queue</strong> for pipelining pre-fetched code.</li>
+                                <li>Houses Segment Registers (<strong class="text-cyan-300">CS, DS, SS, ES</strong>) and Instruction Pointer (<strong class="text-cyan-300">IP</strong>).</li>
+                                <li>Generates 20-bit physical addresses using internal dedicated adder circuit.</li>
+                            </ul>
+                        </div>
+
+                        <!-- EU Card -->
+                        <div class="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-2">
+                            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                                <h4 class="font-bold text-amber-400 text-sm">Execution Unit (EU)</h4>
+                                <span class="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono">Internal Execution</span>
+                            </div>
+                            <ul class="text-xs text-slate-300 space-y-2 list-disc pl-4">
+                                <li>Decodes and executes instructions fetched from the BIU instruction queue.</li>
+                                <li>Contains the 16-bit Arithmetic Logic Unit (<strong class="text-amber-300">ALU</strong>).</li>
+                                <li>Houses General Purpose Registers (<strong class="text-amber-300">AX, BX, CX, DX</strong>) and Index/Pointers (<strong class="text-amber-300">SP, BP, SI, DI</strong>).</li>
+                                <li>Maintains the 16-bit <strong class="text-amber-300">FLAGS Register</strong> (Status & Control Flags).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Register Map -->
+                <div id="archTabRegs" class="hidden space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                            <div class="font-mono font-bold text-cyan-400">AX (AH / AL)</div>
+                            <div class="text-slate-300 font-semibold text-[11px]">Accumulator Register</div>
+                            <div class="text-[11px] text-slate-400">Used for I/O operations, arithmetic, and string instructions.</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                            <div class="font-mono font-bold text-cyan-400">BX (BH / BL)</div>
+                            <div class="text-slate-300 font-semibold text-[11px]">Base Register</div>
+                            <div class="text-[11px] text-slate-400">Serves as base address pointer for memory array indexing.</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                            <div class="font-mono font-bold text-cyan-400">CX (CH / CL)</div>
+                            <div class="text-slate-300 font-semibold text-[11px]">Count Register</div>
+                            <div class="text-[11px] text-slate-400">Loop counter for string and repetitive branch instructions.</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                            <div class="font-mono font-bold text-cyan-400">DX (DH / DL)</div>
+                            <div class="text-slate-300 font-semibold text-[11px]">Data Register</div>
+                            <div class="text-[11px] text-slate-400">Holds I/O port addresses and high 16-bits of multiplication/division.</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                            <div class="font-mono font-bold text-amber-400">SI / DI</div>
+                            <div class="text-slate-300 font-semibold text-[11px]">Source / Destination Index</div>
+                            <div class="text-[11px] text-slate-400">Offset pointers for string block movement and indirect addressing.</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                            <div class="font-mono font-bold text-amber-400">SP / BP</div>
+                            <div class="text-slate-300 font-semibold text-[11px]">Stack / Base Pointer</div>
+                            <div class="text-[11px] text-slate-400">Stack frame top address and base frame offset registers.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC & THREE.JS ENGINE -->
+    <script>
+
+        // Global State Variables
+        let currentMode = 'MIN'; // 'MIN' or 'MAX'
+        let currentCategory = 'ALL';
+        let selectedPinId = 1;
+        let isAutoRotate = false;
+        let isWireframe = false;
+        let isExploded = false;
+
+        // Complete Pin Data for all 40 Pins of 8086 Microprocessor
+        const pinsData = [
+            { id: 1, name: "Vss", minName: "Vss", maxName: "Vss", category: "Power", dir: "GND", desc: "Ground reference line (0V).", details: "System ground line. Must be connected to 0V power supply ground. Note that Pin 20 is also Vss; both ground pins must be connected.", related: [20, 40] },
+            { id: 2, name: "AD14", minName: "AD14", maxName: "AD14", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 14.", details: "Multiplexed line. Carries Address bit A14 during T1 clock state, and Data bit D14 during T2, T3, Tw, and T4 states.", related: [1, 3, 39] },
+            { id: 3, name: "AD13", minName: "AD13", maxName: "AD13", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 13.", details: "Multiplexed line carrying Address A13 in T1 and Data D13 in T2-T4.", related: [2, 4] },
+            { id: 4, name: "AD12", minName: "AD12", maxName: "AD12", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 12.", details: "Multiplexed line carrying Address A12 in T1 and Data D12 in T2-T4.", related: [3, 5] },
+            { id: 5, name: "AD11", minName: "AD11", maxName: "AD11", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 11.", details: "Multiplexed line carrying Address A11 in T1 and Data D11 in T2-T4.", related: [4, 6] },
+            { id: 6, name: "AD10", minName: "AD10", maxName: "AD10", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 10.", details: "Multiplexed line carrying Address A10 in T1 and Data D10 in T2-T4.", related: [5, 7] },
+            { id: 7, name: "AD9", minName: "AD9", maxName: "AD9", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 9.", details: "Multiplexed line carrying Address A9 in T1 and Data D9 in T2-T4.", related: [6, 8] },
+            { id: 8, name: "AD8", minName: "AD8", maxName: "AD8", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 8.", details: "Multiplexed line carrying Address A8 in T1 and Data D8 in T2-T4.", related: [7, 9, 34] },
+            { id: 9, name: "AD7", minName: "AD7", maxName: "AD7", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 7.", details: "Multiplexed line carrying Address A7 in T1 and Data D7 in T2-T4.", related: [8, 10] },
+            { id: 10, name: "AD6", minName: "AD6", maxName: "AD6", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 6.", details: "Multiplexed line carrying Address A6 in T1 and Data D6 in T2-T4.", related: [9, 11] },
+            { id: 11, name: "AD5", minName: "AD5", maxName: "AD5", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 5.", details: "Multiplexed line carrying Address A5 in T1 and Data D5 in T2-T4.", related: [10, 12] },
+            { id: 12, name: "AD4", minName: "AD4", maxName: "AD4", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 4.", details: "Multiplexed line carrying Address A4 in T1 and Data D4 in T2-T4.", related: [11, 13] },
+            { id: 13, name: "AD3", minName: "AD3", maxName: "AD3", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 3.", details: "Multiplexed line carrying Address A3 in T1 and Data D3 in T2-T4.", related: [12, 14] },
+            { id: 14, name: "AD2", minName: "AD2", maxName: "AD2", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 2.", details: "Multiplexed line carrying Address A2 in T1 and Data D2 in T2-T4.", related: [13, 15] },
+            { id: 15, name: "AD1", minName: "AD1", maxName: "AD1", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 1.", details: "Multiplexed line carrying Address A1 in T1 and Data D1 in T2-T4.", related: [14, 16] },
+            { id: 16, name: "AD0", minName: "AD0", maxName: "AD0", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 0 (LSB).", details: "Lowest order multiplexed address/data line. Also indicates even byte memory bank selection during T1.", related: [15, 34] },
+            { id: 17, name: "NMI", minName: "NMI", maxName: "NMI", category: "Interrupt", dir: "Input", desc: "Non-Maskable Interrupt.", details: "Edge-triggered positive edge transition input. Cannot be masked by Interrupt Flag (IF). Causes CPU to jump to Interrupt Vector 2.", related: [18, 19] },
+            { id: 18, name: "INTR", minName: "INTR", maxName: "INTR", category: "Interrupt", dir: "Input", desc: "Interrupt Request.", details: "Level-triggered interrupt request input line. Sampled during the last clock cycle of each instruction. Maskable by clearing IF flag.", related: [17, 24] },
+            { id: 19, name: "CLK", minName: "CLK", maxName: "CLK", category: "Control", dir: "Input", desc: "System Clock Input.", details: "Provides basic timing clock signal (usually 5MHz, 8MHz, or 10MHz with 33% duty cycle) generated by 8284A clock generator IC.", related: [21, 22] },
+            { id: 20, name: "Vss", minName: "Vss", maxName: "Vss", category: "Power", dir: "GND", desc: "Ground reference line (0V).", details: "Second system ground pin. Must be tied directly to power ground alongside Pin 1.", related: [1, 40] },
+            { id: 21, name: "RESET", minName: "RESET", maxName: "RESET", category: "Control", dir: "Input", desc: "Reset Input Signal.", details: "Active HIGH signal. Must remain HIGH for at least 4 clock cycles to reset CPU. Sets CS=FFFFh, IP=0000h, clears FLAGS.", related: [19, 22] },
+            { id: 22, name: "READY", minName: "READY", maxName: "READY", category: "Control", dir: "Input", desc: "Ready Input Strobe.", details: "Acknowledgment signal from slow memory or I/O devices. If LOW, CPU inserts Wait states (Tw) to extend cycle.", related: [19, 21] },
+            { id: 23, name: "/TEST", minName: "/TEST", maxName: "/TEST", category: "Control", dir: "Input", desc: "Test Input Signal.", details: "Examined by the WAIT instruction. If LOW, execution continues; if HIGH, CPU remains in idle wait loop.", related: [21, 22] },
+            { id: 24, name: "/INTA", minName: "/INTA", maxName: "QS1", category: "Dual", dir: "Output", desc: "Interrupt Acknowledge (Min) / Queue Status 1 (Max).", minDesc: "Interrupt Acknowledge: Low pulses sent during interrupt cycles to prompt 8259A PIC for interrupt vector.", maxDesc: "Queue Status 1: Indicates status of internal 6-byte instruction queue (QS1/QS0 decoding).", details: "Min Mode: Driven LOW during T2-T4 of interrupt ack cycles. Max Mode: QS1/QS0 code status of BIU queue.", related: [18, 25] },
+            { id: 25, name: "ALE", minName: "ALE", maxName: "QS0", category: "Dual", dir: "Output", desc: "Address Latch Enable (Min) / Queue Status 0 (Max).", minDesc: "Address Latch Enable: Pulse provided during T1 to latch valid address from AD0-AD15 into 8282 latches.", maxDesc: "Queue Status 0: Indicates status of instruction queue along with QS1.", details: "Min Mode: Positive strobe pulse during T1. Max Mode: Decoded with QS1 to track instruction queue operations.", related: [24, 26] },
+            { id: 26, name: "/DEN", minName: "/DEN", maxName: "/S0", category: "Dual", dir: "Output", desc: "Data Enable (Min) / Bus Status 0 (Max).", minDesc: "Data Enable: Active LOW signal to enable external data bus transceivers (8286).", maxDesc: "Status Line 0: Bus cycle status line output to 8288 Bus Controller.", details: "Min Mode: Low during active data transfers. Max Mode: Encodes bus cycle type with /S1 and /S2.", related: [25, 27] },
+            { id: 27, name: "DT//R", minName: "DT//R", maxName: "/S1", category: "Dual", dir: "Output", desc: "Data Transmit/Receive (Min) / Bus Status 1 (Max).", minDesc: "Data Transmit/Receive: Controls direction of data flow through transceivers (HIGH = Transmit, LOW = Receive).", maxDesc: "Status Line 1: Bus cycle status line output to 8288 Bus Controller.", details: "Min Mode: Determines direction of 8286 transceivers. Max Mode: Combines with /S0 and /S2 to indicate bus cycle.", related: [26, 28] },
+            { id: 28, name: "M//IO", minName: "M//IO", maxName: "/S2", category: "Dual", dir: "Output", desc: "Memory / I/O Select (Min) / Bus Status 2 (Max).", minDesc: "Memory/IO Select: High indicates Memory access; Low indicates I/O port access.", maxDesc: "Status Line 2: Bus cycle status line output to 8288 Bus Controller.", details: "Min Mode: Differentiates memory vs port I/O cycles. Max Mode: Combined with /S0 and /S1 for cycle type.", related: [27, 29] },
+            { id: 29, name: "/WR", minName: "/WR", maxName: "/LOCK", category: "Dual", dir: "Output", desc: "Write Strobe (Min) / Bus Lock (Max).", minDesc: "Write Strobe: Active LOW strobe indicating processor is writing data to memory or I/O.", maxDesc: "Bus Lock Signal: Active LOW signal to prevent other system bus masters from taking control.", details: "Min Mode: Active LOW pulse during T2-T3 for write cycles. Max Mode: Activated by LOCK instruction prefix.", related: [28, 30] },
+            { id: 30, name: "HLDA", minName: "HLDA", maxName: "/RQ//GT1", category: "Dual", dir: "Output / Bi", desc: "Hold Acknowledge (Min) / Request/Grant 1 (Max).", minDesc: "Hold Acknowledge: Output signal acknowledging HOLD request and releasing system bus.", maxDesc: "Request/Grant 1: Bidirectional line for external bus master requesting bus control.", details: "Min Mode: High indicates CPU released buses. Max Mode: Direct bus arbitration line.", related: [29, 31] },
+            { id: 31, name: "HOLD", minName: "HOLD", maxName: "/RQ//GT0", category: "Dual", dir: "Input / Bi", desc: "Hold Request (Min) / Request/Grant 0 (Max).", minDesc: "Hold Request: Input from external DMA controllers requesting control of address/data buses.", maxDesc: "Request/Grant 0: Primary bidirectional bus request/grant line (higher priority than /RQ//GT1).", details: "Min Mode: Prompts CPU to yield bus. Max Mode: Priority bus request/grant line.", related: [30, 32] },
+            { id: 32, name: "/RD", minName: "/RD", maxName: "/RD", category: "Control", dir: "Output", desc: "Read Strobe Signal.", details: "Active LOW strobe indicating CPU is reading data from memory or I/O port. Bus is ready for input data.", related: [28, 29] },
+            { id: 33, name: "MN//MX", minName: "MN//MX", maxName: "MN//MX", category: "Control", dir: "Input", desc: "Minimum / Maximum Mode Select.", details: "Hardwired mode selection input. Tied to +5V (Vcc) for Minimum Mode, or GND (Vss) for Maximum Mode operation.", related: [24, 31] },
+            { id: 34, name: "/BHE / S7", minName: "/BHE / S7", maxName: "/BHE / S7", category: "Address/Data", dir: "Output", desc: "Bus High Enable / Status S7.", details: "Multiplexed line. Active LOW /BHE during T1 enables data on high byte bus (AD15-AD8). Outputs status S7 during T2-T4.", related: [8, 39] },
+            { id: 35, name: "A19 / S6", minName: "A19 / S6", maxName: "A19 / S6", category: "Address/Data", dir: "Output", desc: "Address Bit 19 / Status S6.", details: "Multiplexed line. Outputs Address bit A19 during T1; Status S6 during T2-T4 (always 0 on 8086).", related: [36, 37] },
+            { id: 36, name: "A18 / S5", minName: "A18 / S5", maxName: "A18 / S5", category: "Address/Data", dir: "Output", desc: "Address Bit 18 / Status S5.", details: "Multiplexed line. Outputs Address bit A18 during T1; Status S5 reflects state of Interrupt Enable Flag (IF).", related: [35, 37] },
+            { id: 37, name: "A17 / S4", minName: "A17 / S4", maxName: "A17 / S4", category: "Address/Data", dir: "Output", desc: "Address Bit 17 / Status S4.", details: "Multiplexed line. Outputs Address bit A17 during T1; Status S4 encodes active segment register along with S3.", related: [36, 38] },
+            { id: 38, name: "A16 / S3", minName: "A16 / S3", maxName: "A16 / S3", category: "Address/Data", dir: "Output", desc: "Address Bit 16 / Status S3.", details: "Multiplexed line. Outputs Address bit A16 during T1; Status S3/S4 decode active segment register.", related: [37, 39] },
+            { id: 39, name: "AD15", minName: "AD15", maxName: "AD15", category: "Address/Data", dir: "Bidirectional", desc: "Address/Data Bit 15 (MSB).", details: "Highest multiplexed address/data line. Carries Address bit A15 during T1 and Data bit D15 during T2-T4.", related: [2, 34, 38] },
+            { id: 40, name: "Vcc", minName: "Vcc", maxName: "Vcc", category: "Power", dir: "Power (+5V)", desc: "Main Power Supply Input (+5V DC).", details: "Main positive power supply pin. Must be connected to +5V DC ±10% regulated power source.", related: [1, 20] }
+        ];
+
+
+        // Three.js Scene Globals
+        let scene, camera, renderer, controls;
+        let chipMesh, pinGroup;
+        let pinMeshes = [];
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let hoveredPinMesh = null;
+
+        // Initialize Three.js Environment
+        function initThree() {
+            const container = document.getElementById('canvasContainer');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x080c14);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(16, 18, 22);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Controls setup
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1;
+            controls.minDistance = 6;
+            controls.maxDistance = 50;
+
+            // Lighting Setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            mainLight.position.set(15, 25, 15);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 1024;
+            mainLight.shadow.mapSize.height = 1024;
+            scene.add(mainLight);
+
+            const blueLight = new THREE.PointLight(0x06b6d4, 1.5, 30);
+            blueLight.position.set(-10, -5, -10);
+            scene.add(blueLight);
+
+            const goldLight = new THREE.PointLight(0xf59e0b, 1.0, 30);
+            goldLight.position.set(10, 5, -10);
+            scene.add(goldLight);
+
+            // Build 3D DIP-40 Microprocessor Chip Model
+            buildChipModel();
+
+            // Event Listeners for Raycasting & Resize
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('mousemove', onPointerMove);
+            renderer.domElement.addEventListener('click', onPointerClick);
+
+            // Start Animation Loop
+            animate();
+        }
+
+        // Generate Laser-Etched Text Canvas Texture for Top Surface
+        function createChipTopTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 2048;
+            const ctx = canvas.getContext('2d');
+
+            // Dark matte ceramic surface
+            ctx.fillStyle = '#18181b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Outer bevel ring
+            ctx.strokeStyle = '#27272a';
+            ctx.lineWidth = 12;
+            ctx.strokeRect(16, 16, canvas.width - 32, canvas.height - 32);
+
+            // Notch at Top (Pin 1 orientation indicator)
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, 40, 70, 0, Math.PI, false);
+            ctx.fillStyle = '#09090b';
+            ctx.fill();
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#3f3f46';
+            ctx.stroke();
+
+            // Pin 1 Dot Marker
+            ctx.beginPath();
+            ctx.arc(90, 140, 22, 0, Math.PI * 2);
+            ctx.fillStyle = '#3f3f46';
+            ctx.fill();
+
+            // Vertical Text Printing
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Intel Logo / Chip Name
+            ctx.font = 'bold 110px monospace';
+            ctx.fillStyle = '#e4e4e7';
+            ctx.fillText('i  8086', 0, -80);
+
+            ctx.font = 'bold 42px sans-serif';
+            ctx.fillStyle = '#a1a1aa';
+            ctx.fillText('INTEL \'78 \'81', 0, 10);
+
+            ctx.font = '32px monospace';
+            ctx.fillStyle = '#71717a';
+            ctx.fillText('D8086-2  L208149', 0, 80);
+            ctx.fillText('DIP-40 16-BIT CPU', 0, 130);
+
+            ctx.restore();
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            return texture;
+        }
+
+        // Construct DIP-40 Geometry & Pins
+        function buildChipModel() {
+            pinGroup = new THREE.Group();
+            scene.add(pinGroup);
+
+            // Materials
+            const bodyTexture = createChipTopTexture();
+            const topMaterial = new THREE.MeshStandardMaterial({ map: bodyTexture, roughness: 0.5, metalness: 0.2 });
+            const sideMaterial = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.6, metalness: 0.1 });
+            
+            // Materials for BoxGeometry (right, left, top, bottom, front, back)
+            const bodyMaterials = [
+                sideMaterial, // right
+                sideMaterial, // left
+                topMaterial,  // top
+                sideMaterial, // bottom
+                sideMaterial, // front
+                sideMaterial  // back
+            ];
+
+            // Main IC Ceramic Body (Width X=6, Height Y=1.2, Length Z=22)
+            const bodyGeo = new THREE.BoxGeometry(6, 1.2, 22);
+            chipMesh = new THREE.Mesh(bodyGeo, bodyMaterials);
+            chipMesh.castShadow = true;
+            chipMesh.receiveShadow = true;
+            pinGroup.add(chipMesh);
+
+            // Create 40 Metallic Legs / Pins
+            // Pins 1..20 on Left Side (X = -3.0), Pins 21..40 on Right Side (X = +3.0)
+            const metalMaterial = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, metalness: 0.85, roughness: 0.25 });
+
+            for (let i = 1; i <= 40; i++) {
+                const pinContainer = new THREE.Group();
+                const isLeft = i <= 20;
+
+                // Z Position calculation: Pins spaced 1.05 units apart
+                const zIndex = isLeft ? (i - 1) : (40 - i);
+                const zPos = -9.975 + zIndex * 1.05;
+                const xPos = isLeft ? -3.0 : 3.0;
+
+                pinContainer.position.set(xPos, -0.2, zPos);
+
+                // Pin Leg Geometry (Stub + Bent Downward Tip)
+                const stubGeo = new THREE.BoxGeometry(0.8, 0.15, 0.35);
+                const stubMesh = new THREE.Mesh(stubGeo, metalMaterial);
+                stubMesh.position.set(isLeft ? -0.4 : 0.4, 0, 0);
+
+                const legGeo = new THREE.BoxGeometry(0.18, 1.4, 0.35);
+                const legMesh = new THREE.Mesh(legGeo, metalMaterial);
+                legMesh.position.set(isLeft ? -0.75 : 0.75, -0.65, 0);
+
+                pinContainer.add(stubMesh);
+                pinContainer.add(legMesh);
+
+                // Invisible Outer Click/Glow Box for Raycasting
+                const hitGeo = new THREE.BoxGeometry(1.2, 1.8, 0.6);
+                const hitMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0, wireframe: false });
+                const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+                hitMesh.position.set(isLeft ? -0.5 : 0.5, -0.4, 0);
+                hitMesh.userData = { pinId: i };
+                pinContainer.add(hitMesh);
+
+                pinGroup.add(pinContainer);
+
+                pinMeshes.push({
+                    id: i,
+                    group: pinContainer,
+                    hitMesh: hitMesh,
+                    stubMesh: stubMesh,
+                    legMesh: legMesh,
+                    baseX: xPos,
+                    baseZ: zPos,
+                    isLeft: isLeft
+                });
+            }
+
+            // Default Select Pin 1
+            highlightPinIn3D(1);
+        }
+
+
+        // Handle Mouse Pointer Move for Raycast Hovering
+        function onPointerMove(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(pinMeshes.map(p => p.hitMesh));
+
+            const tooltip = document.getElementById('hoverTooltip');
+
+            if (intersects.length > 0) {
+                const hitObject = intersects[0].object;
+                const pinId = hitObject.userData.pinId;
+                const pinInfo = pinsData.find(p => p.id === pinId);
+
+                document.body.style.cursor = 'pointer';
+
+                // Update Tooltip Text
+                document.getElementById('hoverPinNum').textContent = `Pin ${pinId}`;
+                document.getElementById('hoverPinName').textContent = currentMode === 'MIN' ? pinInfo.minName : pinInfo.maxName;
+
+                // Tooltip Position
+                tooltip.style.left = `${event.clientX}px`;
+                tooltip.style.top = `${event.clientY - 10}px`;
+                tooltip.classList.remove('hidden');
+
+                if (hoveredPinMesh !== hitObject) {
+                    if (hoveredPinMesh && hoveredPinMesh.userData.pinId !== selectedPinId) {
+                        hoveredPinMesh.material.opacity = 0;
+                    }
+                    hoveredPinMesh = hitObject;
+                    if (hoveredPinMesh.userData.pinId !== selectedPinId) {
+                        hoveredPinMesh.material.color.setHex(0x06b6d4);
+                        hoveredPinMesh.material.opacity = 0.35;
+                    }
+                }
+            } else {
+                document.body.style.cursor = 'default';
+                tooltip.classList.add('hidden');
+                if (hoveredPinMesh && hoveredPinMesh.userData.pinId !== selectedPinId) {
+                    hoveredPinMesh.material.opacity = 0;
+                    hoveredPinMesh = null;
+                }
+            }
+        }
+
+        // Handle Pointer Click to Select Pin
+        function onPointerClick(event) {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(pinMeshes.map(p => p.hitMesh));
+
+            if (intersects.length > 0) {
+                const pinId = intersects[0].object.userData.pinId;
+                selectPin(pinId, true);
+            }
+        }
+
+        // Highlight Selected Pin in 3D & Animate Camera
+        function highlightPinIn3D(pinId, focusCamera = false) {
+            selectedPinId = pinId;
+
+            pinMeshes.forEach(p => {
+                if (p.id === pinId) {
+                    p.hitMesh.material.color.setHex(0xf59e0b); // Gold selection
+                    p.hitMesh.material.opacity = 0.6;
+
+                    if (focusCamera) {
+                        // Smoothly Focus Camera towards Pin
+                        const pinWorldPos = new THREE.Vector3();
+                        p.group.getWorldPosition(pinWorldPos);
+
+                        const targetCam = pinWorldPos.clone().add(new THREE.Vector3(p.isLeft ? -8 : 8, 6, 4));
+                        animateCameraTo(targetCam, pinWorldPos);
+                    }
+                } else {
+                    p.hitMesh.material.opacity = 0;
+                }
+            });
+        }
+
+        // Camera Smooth Interpolation
+        function animateCameraTo(targetPos, lookAtPos) {
+            const startPos = camera.position.clone();
+            const startTarget = controls.target.clone();
+            let duration = 30;
+            let frame = 0;
+
+            function step() {
+                frame++;
+                const progress = frame / duration;
+                const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
+
+                camera.position.lerpVectors(startPos, targetPos, easeProgress);
+                controls.target.lerpVectors(startTarget, lookAtPos, easeProgress);
+                controls.update();
+
+                if (frame < duration) {
+                    requestAnimationFrame(step);
+                }
+            }
+            step();
+        }
+
+        // Toggle Views and Camera Functions
+        function resetCamera() {
+            animateCameraTo(new THREE.Vector3(16, 18, 22), new THREE.Vector3(0, 0, 0));
+        }
+
+        function toggleAutoRotate() {
+            isAutoRotate = !isAutoRotate;
+            controls.autoRotate = isAutoRotate;
+            controls.autoRotateSpeed = 2.0;
+            const btn = document.getElementById('toggleRotateBtn');
+            btn.classList.toggle('bg-cyan-500/20', isAutoRotate);
+            btn.classList.toggle('text-cyan-400', isAutoRotate);
+        }
+
+        function toggleWireframe() {
+            isWireframe = !isWireframe;
+            chipMesh.material.forEach(m => m.wireframe = isWireframe);
+            const btn = document.getElementById('toggleWireframeBtn');
+            btn.classList.toggle('bg-cyan-500/20', isWireframe);
+            btn.classList.toggle('text-cyan-400', isWireframe);
+        }
+
+        function toggleExplodeView() {
+            isExploded = !isExploded;
+            pinMeshes.forEach(p => {
+                const targetX = isExploded ? (p.isLeft ? -5.5 : 5.5) : p.baseX;
+                p.group.position.x = targetX;
+            });
+            const btn = document.getElementById('toggleExplodeBtn');
+            btn.classList.toggle('bg-cyan-500/20', isExploded);
+            btn.classList.toggle('text-cyan-400', isExploded);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvasContainer');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+
+        // UI Mode Switcher (MIN Mode vs MAX Mode)
+        function setMode(mode) {
+            currentMode = mode;
+
+            const btnMin = document.getElementById('btnMinMode');
+            const btnMax = document.getElementById('btnMaxMode');
+            const badge = document.getElementById('modeStatusBadge');
+
+            if (mode === 'MIN') {
+                btnMin.className = "px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 bg-cyan-500 text-slate-950 font-mono shadow";
+                btnMax.className = "px-3 py-1 rounded-full text-xs font-semibold text-slate-400 hover:text-white transition-all duration-200 font-mono";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span><span>MINIMUM MODE ACTIVE</span>`;
+                badge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 backdrop-blur shadow flex items-center gap-2";
+            } else {
+                btnMax.className = "px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 bg-rose-500 text-white font-mono shadow";
+                btnMin.className = "px-3 py-1 rounded-full text-xs font-semibold text-slate-400 hover:text-white transition-all duration-200 font-mono";
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span><span>MAXIMUM MODE ACTIVE</span>`;
+                badge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 backdrop-blur shadow flex items-center gap-2";
+            }
+
+            renderPinList();
+            selectPin(selectedPinId, false);
+        }
+
+        // Category Filter Setup
+        function setCategoryFilter(cat) {
+            currentCategory = cat;
+            const buttons = document.querySelectorAll('.cat-btn');
+            buttons.forEach(btn => {
+                const matches = btn.getAttribute('onclick').includes(`'${cat}'`);
+                if (matches) {
+                    btn.className = "cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
+                } else {
+                    btn.className = "cat-btn px-2 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500";
+                }
+            });
+            renderPinList();
+        }
+
+        // Search Input Filter
+        function filterPins() {
+            renderPinList();
+        }
+
+        // Render Sidebar Pin List Items
+        function renderPinList() {
+            const listContainer = document.getElementById('pinList');
+            const query = document.getElementById('pinSearch').value.toLowerCase();
+
+            listContainer.innerHTML = '';
+
+            pinsData.forEach(pin => {
+                const activeName = currentMode === 'MIN' ? pin.minName : pin.maxName;
+                const matchesCat = currentCategory === 'ALL' || 
+                    (currentCategory === 'Dual' && pin.category === 'Dual') ||
+                    (currentCategory !== 'Dual' && pin.category === currentCategory);
+
+                const matchesQuery = pin.id.toString().includes(query) ||
+                    pin.name.toLowerCase().includes(query) ||
+                    pin.minName.toLowerCase().includes(query) ||
+                    pin.maxName.toLowerCase().includes(query) ||
+                    pin.desc.toLowerCase().includes(query);
+
+                if (matchesCat && matchesQuery) {
+                    const isSelected = pin.id === selectedPinId;
+                    const item = document.createElement('div');
+
+                    item.onclick = () => selectPin(pin.id, true);
+                    item.className = `p-2 rounded-lg cursor-pointer transition flex items-center justify-between border ${
+                        isSelected 
+                            ? 'bg-cyan-500/15 border-cyan-500/50 text-white' 
+                            : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:bg-slate-800/80'
+                    }`;
+
+                    let badgeColor = 'bg-slate-800 text-slate-400 border-slate-700';
+                    if (pin.category === 'Power') badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+                    if (pin.category === 'Address/Data') badgeColor = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30';
+                    if (pin.category === 'Dual') badgeColor = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+
+                    item.innerHTML = `
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-6 h-6 rounded bg-slate-950 border border-slate-800 text-slate-400 text-[11px] font-mono font-bold flex items-center justify-center">
+                                ${pin.id}
+                            </span>
+                            <div>
+                                <div class="text-xs font-bold font-mono text-slate-100 flex items-center gap-1.5">
+                                    ${activeName}
+                                    ${pin.category === 'Dual' ? `<span class="text-[9px] px-1 rounded bg-rose-500/20 text-rose-400">DUAL</span>` : ''}
+                                </div>
+                                <div class="text-[10px] text-slate-400 truncate max-w-[140px]">${pin.desc}</div>
+                            </div>
+                        </div>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded border ${badgeColor} font-medium">
+                            ${pin.dir}
+                        </span>
+                    `;
+
+                    listContainer.appendChild(item);
+                }
+            });
+        }
+
+        // Select Pin Action & Populate Inspector Panel
+        function selectPin(pinId, focusCamera = true) {
+            const pin = pinsData.find(p => p.id === pinId);
+            if (!pin) return;
+
+            highlightPinIn3D(pinId, focusCamera);
+            renderPinList();
+
+            document.getElementById('inspectorDefault').classList.add('hidden');
+            document.getElementById('inspectorActive').classList.remove('hidden');
+
+            // Populate Badges & Names
+            document.getElementById('pinNumBadge').textContent = `PIN ${pin.id}`;
+            document.getElementById('pinCategoryBadge').textContent = pin.category;
+
+            const activeName = currentMode === 'MIN' ? pin.minName : pin.maxName;
+            document.getElementById('pinTitle').textContent = activeName;
+            document.getElementById('pinDirection').innerHTML = `<i class="fa-solid fa-arrow-right-left text-cyan-400"></i> Signal Direction: <span class="text-slate-200 font-semibold">${pin.dir}</span>`;
+
+            // Dual Function Banner Logic
+            const dualBanner = document.getElementById('dualModeBanner');
+            if (pin.category === 'Dual') {
+                dualBanner.classList.remove('hidden');
+                document.getElementById('dualMinName').textContent = pin.minName;
+                document.getElementById('dualMaxName').textContent = pin.maxName;
+            } else {
+                dualBanner.classList.add('hidden');
+            }
+
+            // Descriptions & Details
+            const activeDesc = (pin.category === 'Dual') 
+                ? (currentMode === 'MIN' ? pin.minDesc || pin.desc : pin.maxDesc || pin.desc)
+                : pin.desc;
+
+            document.getElementById('pinDesc').textContent = activeDesc;
+            document.getElementById('pinDetails').textContent = pin.details;
+
+            // Related Pins
+            const relContainer = document.getElementById('relatedPinsContainer');
+            relContainer.innerHTML = '';
+            pin.related.forEach(relId => {
+                const relPin = pinsData.find(p => p.id === relId);
+                if (relPin) {
+                    const btn = document.createElement('button');
+                    btn.onclick = () => selectPin(relPin.id, true);
+                    btn.className = "px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] font-mono text-cyan-400 flex items-center gap-1 transition";
+                    btn.innerHTML = `<span class="text-slate-400">Pin ${relPin.id}:</span> ${currentMode === 'MIN' ? relPin.minName : relPin.maxName}`;
+                    relContainer.appendChild(btn);
+                }
+            });
+        }
+
+
+        // Simulator State
+        let currentSimPreset = 'MEM_READ';
+        let currentSimStep = 1;
+        let simInterval = null;
+
+        const simPresets = {
+            'MEM_READ': {
+                title: 'Memory Read Cycle',
+                steps: [
+                    { step: 1, label: 'State T1: Address Output & Latch Strobe', desc: 'Processor outputs 20-bit address on AD0-AD15 & A16-A19. ALE pulses HIGH to trigger external latches (8282) to capture address. DT//R goes LOW.', pins: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 25, 27, 34, 35, 36, 37, 38, 39] },
+                    { step: 2, label: 'State T2: Address Float & /RD Pulse', desc: 'Address removed from AD0-AD15 (bus floats for read turnaround). /RD goes LOW to enable memory output. M//IO stays HIGH.', pins: [28, 32] },
+                    { step: 3, label: 'State T3: Data Enable & Memory Read', desc: '/DEN driven LOW to activate transceivers (8286). External memory places requested data byte/word onto AD0-AD15 data bus lines.', pins: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 26, 32, 39] },
+                    { step: 4, label: 'State T4: Data Capture & Cycle Return', desc: 'Processor latches data byte into internal register. /RD and /DEN return HIGH. Bus cycle completes.', pins: [26, 32] }
+                ]
+            },
+            'MEM_WRITE': {
+                title: 'Memory Write Cycle',
+                steps: [
+                    { step: 1, label: 'State T1: Address Output & Transmit Dir', desc: 'Processor outputs target address. ALE pulses HIGH to latch address. DT//R set HIGH (Transmit mode). M//IO set HIGH.', pins: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 25, 27, 28, 34, 35, 36, 37, 38, 39] },
+                    { step: 2, label: 'State T2: Write Data Output & /WR Strobe', desc: 'CPU places write data onto AD0-AD15. /WR strobe goes LOW indicating valid output data. /DEN goes LOW.', pins: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 26, 29, 39] },
+                    { step: 3, label: 'State T3: Data Stable & Memory Latch', desc: 'Data bus held stable while /WR remains LOW. Memory chip writes data byte into target RAM location.', pins: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 26, 29, 39] },
+                    { step: 4, label: 'State T4: Strobe Deassertion & Bus Release', desc: '/WR and /DEN return HIGH. Processor releases data lines to idle state.', pins: [26, 29] }
+                ]
+            },
+            'INT_ACK': {
+                title: 'Interrupt Acknowledge Cycle',
+                steps: [
+                    { step: 1, label: 'State T1: Interrupt Request Sampled', desc: 'External device asserts INTR line HIGH. CPU finishes current instruction and initiates interrupt acknowledge.', pins: [18] },
+                    { step: 2, label: 'State T2: First /INTA Pulse Issued', desc: 'Processor drives /INTA LOW (Pulse 1) to inform 8259A Interrupt Controller that request is accepted.', pins: [24] },
+                    { step: 3, label: 'State T3: Second /INTA Pulse & Vector Fetch', desc: 'Processor drives /INTA LOW (Pulse 2). 8259A PIC places 8-bit Interrupt Vector Number on AD0-AD7 lines.', pins: [8, 9, 10, 11, 12, 13, 14, 15, 16, 24] },
+                    { step: 4, label: 'State T4: Vector Read & ISR Jump', desc: 'CPU reads vector number, multiplies by 4, pushes FLAGS, CS, IP to stack, and jumps to Interrupt Service Routine.', pins: [24] }
+                ]
+            }
+        };
+
+        function openSimulatorModal() {
+            document.getElementById('simulatorModal').classList.remove('hidden');
+            renderSimStep();
+        }
+
+        function closeSimulatorModal() {
+            document.getElementById('simulatorModal').classList.add('hidden');
+            if (simInterval) clearInterval(simInterval);
+        }
+
+        function selectSimPreset(presetKey) {
+            currentSimPreset = presetKey;
+            currentSimStep = 1;
+
+            document.querySelectorAll('.sim-preset-btn').forEach(btn => {
+                btn.className = "sim-preset-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-left hover:border-slate-700 transition";
+            });
+
+            const activeBtn = document.getElementById(presetKey === 'MEM_READ' ? 'presetMemRead' : (presetKey === 'MEM_WRITE' ? 'presetMemWrite' : 'presetIntAck'));
+            activeBtn.className = "sim-preset-btn p-3 rounded-xl border border-cyan-500 bg-cyan-500/10 text-left transition";
+
+            renderSimStep();
+        }
+
+        function renderSimStep() {
+            const sim = simPresets[currentSimPreset];
+            const stepData = sim.steps[currentSimStep - 1];
+
+            document.getElementById('simStepLabel').textContent = stepData.label;
+            document.getElementById('simStepDesc').textContent = stepData.desc;
+
+            // Update Progress Bar
+            for (let i = 1; i <= 4; i++) {
+                const bar = document.getElementById(`tStep${i}`);
+                if (i <= currentSimStep) {
+                    bar.className = "h-2 rounded bg-cyan-500 transition-all duration-300 shadow-sm shadow-cyan-500/50";
+                } else {
+                    bar.className = "h-2 rounded bg-slate-800 transition-all duration-300";
+                }
+            }
+
+            // Update Active Pins Badges
+            const listContainer = document.getElementById('simActivePinsList');
+            listContainer.innerHTML = '';
+
+            stepData.pins.forEach(pId => {
+                const pin = pinsData.find(p => p.id === pId);
+                const badge = document.createElement('span');
+                badge.className = "px-2 py-1 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono text-xs font-bold animate-pulse";
+                badge.textContent = `Pin ${pId} (${currentMode === 'MIN' ? pin.minName : pin.maxName})`;
+                listContainer.appendChild(badge);
+            });
+
+            // Highlight active simulation pins on 3D Chip Model
+            pinMeshes.forEach(p => {
+                if (stepData.pins.includes(p.id)) {
+                    p.hitMesh.material.color.setHex(0x06b6d4);
+                    p.hitMesh.material.opacity = 0.8;
+                } else {
+                    p.hitMesh.material.opacity = 0;
+                }
+            });
+        }
+
+        function nextSimStep() {
+            currentSimStep = (currentSimStep % 4) + 1;
+            renderSimStep();
+        }
+
+        function prevSimStep() {
+            currentSimStep = currentSimStep === 1 ? 4 : currentSimStep - 1;
+            renderSimStep();
+        }
+
+        function toggleSimAutoPlay() {
+            const btn = document.getElementById('simAutoPlayBtn');
+            if (simInterval) {
+                clearInterval(simInterval);
+                simInterval = null;
+                btn.innerHTML = `<i class="fa-solid fa-play mr-1"></i> Auto-Play`;
+            } else {
+                simInterval = setInterval(nextSimStep, 1500);
+                btn.innerHTML = `<i class="fa-solid fa-pause mr-1"></i> Pause`;
+            }
+        }
+
+
+        // Modals Management
+        function openArchModal() {
+            document.getElementById('archModal').classList.remove('hidden');
+            calculateAddress();
+        }
+
+        function closeArchModal() {
+            document.getElementById('archModal').classList.add('hidden');
+        }
+
+        function switchArchTab(tab) {
+            document.getElementById('archTabCalc').classList.add('hidden');
+            document.getElementById('archTabBiu').classList.add('hidden');
+            document.getElementById('archTabRegs').classList.add('hidden');
+
+            document.getElementById('tabBtnCalc').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+            document.getElementById('tabBtnBiu').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+            document.getElementById('tabBtnRegs').className = "pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition";
+
+            if (tab === 'calc') {
+                document.getElementById('archTabCalc').classList.remove('hidden');
+                document.getElementById('tabBtnCalc').className = "pb-2 border-b-2 border-cyan-400 text-cyan-400 transition";
+            } else if (tab === 'biu_eu') {
+                document.getElementById('archTabBiu').classList.remove('hidden');
+                document.getElementById('tabBtnBiu').className = "pb-2 border-b-2 border-cyan-400 text-cyan-400 transition";
+            } else {
+                document.getElementById('archTabRegs').classList.remove('hidden');
+                document.getElementById('tabBtnRegs').className = "pb-2 border-b-2 border-cyan-400 text-cyan-400 transition";
+            }
+        }
+
+        // 20-Bit Address Calculator Engine
+        function calculateAddress() {
+            const segHex = document.getElementById('calcSegInput').value.replace(/[^0-9A-Fa-f]/g, '') || '0';
+            const offHex = document.getElementById('calcOffInput').value.replace(/[^0-9A-Fa-f]/g, '') || '0';
+
+            const segVal = parseInt(segHex, 16) || 0;
+            const offVal = parseInt(offHex, 16) || 0;
+
+            const shiftedSeg = (segVal << 4) & 0xFFFFF;
+            const physicalAddr = (shiftedSeg + offVal) & 0xFFFFF;
+
+            document.getElementById('calcShiftedSeg').textContent = `${shiftedSeg.toString(16).toUpperCase().padStart(5, '0')} H`;
+            document.getElementById('calcOffDisplay').textContent = `${offVal.toString(16).toUpperCase().padStart(5, '0')} H`;
+            document.getElementById('calcResultHex').textContent = `${physicalAddr.toString(16).toUpperCase().padStart(5, '0')} H`;
+
+            // Convert to 20-bit binary string with grouping
+            const binStr = physicalAddr.toString(2).padStart(20, '0');
+            const formattedBin = binStr.match(/.{1,4}/g).join(' ');
+            document.getElementById('calcResultBin').textContent = formattedBin;
+        }
+
+        // Window Load Initializer
+        window.onload = function () {
+            renderPinList();
+            initThree();
+            selectPin(1, false);
+        };
+    </script>
+</body>
+</html>

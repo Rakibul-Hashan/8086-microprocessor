@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>8086 Architecture Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    :root{
+      --bg:#0a0c10;--panel:#11141a;--panel2:#151922;--line:#242a35;--line2:#303847;
+      --text:#edf1f7;--muted:#8b95a7;--faint:#5f6878;--cyan:#58c7dc;--cyan2:#1d6170;
+      --violet:#a88cf5;--violet2:#4b3b76;--amber:#f1c75b;--green:#5fd0a5;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html{background:var(--bg)}
+    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+    button,input{font:inherit}
+    button{color:inherit}
+    .shell{max-width:1600px;margin:0 auto;padding:0 20px}
+    .topbar{position:sticky;top:0;z-index:40;height:68px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(10,12,16,.92);backdrop-filter:blur(18px)}
+    .topbar-inner{height:100%;display:flex;align-items:center;justify-content:space-between;gap:20px}
+    .brand{display:flex;align-items:center;gap:12px;min-width:0}
+    .brand-mark{width:36px;height:36px;border:1px solid #34404e;background:#111720;border-radius:10px;display:grid;place-items:center;color:#9ee6f2;font-weight:800;letter-spacing:-.04em;box-shadow:inset 0 1px rgba(255,255,255,.04)}
+    .brand h1{margin:0;font-size:15px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+    .brand p{margin:3px 0 0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .btn{height:36px;border:1px solid var(--line2);background:#12161d;border-radius:9px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:12px;font-weight:650;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease;white-space:nowrap}
+    .btn:hover{background:#181e27;border-color:#3a4556}.btn:active{transform:translateY(1px)}
+    .btn.primary{background:#d9f7fb;border-color:#d9f7fb;color:#071014}.btn.primary:hover{background:#bfeef4;border-color:#bfeef4}
+    .btn svg{width:14px;height:14px;display:block}
+    .app-grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;padding-top:16px;padding-bottom:26px;align-items:start}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 16px 44px rgba(0,0,0,.16);overflow:hidden}
+    .diagram-card{min-width:0}
+    .toolbar{min-height:54px;padding:9px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#101319}
+    .segments{display:flex;align-items:center;gap:4px;padding:3px;background:#0c0f14;border:1px solid #202630;border-radius:10px;overflow-x:auto}
+    .seg{height:30px;padding:0 11px;border:0;background:transparent;border-radius:7px;color:#7e899c;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s ease;white-space:nowrap}
+    .seg:hover{color:#c9d2df;background:#141922}.seg.active{color:#e7fbff;background:#183039;box-shadow:inset 0 0 0 1px #285260}
+    .toolbar-hint{display:flex;align-items:center;gap:7px;color:#6f798a;font-size:11px;white-space:nowrap}.kbd{border:1px solid #303844;background:#0b0e13;border-radius:5px;padding:1px 5px;color:#9aa5b6}
+    .statusbar{min-height:44px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 14px;background:#0e1117}
+    .status-dot{width:7px;height:7px;border-radius:999px;background:#637085;box-shadow:0 0 0 4px rgba(99,112,133,.08);flex:0 0 auto}.status-dot.running{background:var(--green);box-shadow:0 0 0 4px rgba(95,208,165,.09)}
+    #status{font-size:12px;color:#9aa5b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status-strong{color:#dce3ed;font-weight:650}
+    .stage-wrap{padding:12px;background:#0c0f14;overflow:auto}
+    .stage{min-width:760px;background:#0f1218;border:1px solid #222833;border-radius:13px;overflow:hidden;position:relative}
+    #cpu{display:block;width:100%;height:auto;min-height:610px}
+    svg text{user-select:none;pointer-events:none}
+    .region{transition:opacity .2s ease}.node{cursor:pointer;outline:none;transition:opacity .2s ease,filter .16s ease}.node:hover{filter:drop-shadow(0 3px 7px rgba(0,0,0,.32))}.node > rect,.node > path{transition:stroke .16s ease,stroke-width .16s ease,fill .16s ease}.node:hover > rect,.node:hover > path{stroke:#cad3df!important;stroke-width:2.5!important}.node.is-active > rect,.node.is-active > path{stroke:var(--amber)!important;stroke-width:3!important;filter:drop-shadow(0 0 7px rgba(241,199,91,.18))}
+    .bus{stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}.flow-path{pointer-events:none;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 5px rgba(255,255,255,.12))}.flow-dot{pointer-events:none;filter:drop-shadow(0 0 5px currentColor)}
+    .side{display:flex;flex-direction:column;gap:16px;position:sticky;top:84px;max-height:calc(100vh - 100px)}
+    .side-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:0 14px 38px rgba(0,0,0,.14)}
+    .side-tabs{display:grid;grid-template-columns:repeat(3,1fr);padding:7px;border-bottom:1px solid var(--line);gap:4px;background:#101319}.side-tab{height:32px;border:0;border-radius:8px;background:transparent;color:#707b8d;font-size:11px;font-weight:750;cursor:pointer}.side-tab:hover{color:#b9c3d0;background:#151a22}.side-tab.active{background:#1a2029;color:#eff3f8;box-shadow:inset 0 0 0 1px #2b3441}
+    .side-content{padding:17px;overflow:auto}.panel-view{display:none}.panel-view.active{display:block}
+    .eyebrow{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#6d788a;font-weight:800}.title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:8px}.title-row h2{font-size:18px;line-height:1.25;margin:0;letter-spacing:-.015em}.pill{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:#9aa5b6;border:1px solid #2d3541;background:#0f1319;border-radius:999px;padding:5px 8px;white-space:nowrap;font-weight:750}.detail-body{color:#99a4b4;font-size:12px;line-height:1.7;margin:10px 0 0}.facts{display:grid;gap:7px;margin-top:14px}.fact{border:1px solid #252c36;background:#0e1117;border-radius:9px;padding:9px 10px;color:#b4bdca;font-size:11px;line-height:1.45}.fact::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#5d697a;margin:0 8px 1px 0}
+    .timeline{display:grid;gap:6px}.step-item{width:100%;border:1px solid transparent;background:transparent;border-radius:10px;padding:9px 10px;text-align:left;cursor:pointer;display:grid;grid-template-columns:25px minmax(0,1fr);gap:9px;transition:background .15s ease,border-color .15s ease}.step-item:hover{background:#151a22}.step-item.active{background:#191812;border-color:#3d3826}.step-num{width:24px;height:24px;border-radius:7px;border:1px solid #2b3440;background:#0e1117;display:grid;place-items:center;color:#748093;font-size:10px;font-weight:800}.step-item.active .step-num{border-color:#6d5d2e;background:#2a2411;color:#f6d978}.step-name{font-size:11px;font-weight:750;color:#ccd4df;line-height:1.3}.step-desc{font-size:10px;color:#687385;margin-top:3px;line-height:1.35}
+    .playground-intro{font-size:11px;line-height:1.55;color:#788496;margin:8px 0 14px}.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field label{display:block;font-size:10px;font-weight:700;color:#7c8798;margin-bottom:6px}.field input{width:100%;height:38px;border:1px solid #2a3240;background:#0b0e13;border-radius:8px;color:#eef2f7;padding:0 10px;text-transform:uppercase;outline:none;font-variant-numeric:tabular-nums}.field input:focus{border-color:#5b6c82;box-shadow:0 0 0 3px rgba(91,108,130,.12)}
+    .sim-btn{width:100%;height:38px;margin-top:10px;border:1px solid #4a3f76;background:#211c35;border-radius:8px;color:#d8cbff;font-size:11px;font-weight:750;cursor:pointer}.sim-btn:hover{background:#292043}.result-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:10px}.result-box{border:1px solid #252d38;background:#0d1015;border-radius:9px;padding:9px}.result-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#687385;font-weight:800}.result-value{display:block;margin-top:5px;font-size:15px;font-weight:800;letter-spacing:.03em;font-variant-numeric:tabular-nums}.flag-value{font-size:10px;color:#e9d17c;line-height:1.5;letter-spacing:0}
+    .legend{padding:10px 14px 12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:#6f798a;font-size:10px;background:#0e1117}.legend-item{display:flex;align-items:center;gap:6px}.legend-line{width:20px;height:2px;border-radius:2px}.legend-note{margin-left:auto;color:#5f6979}
+    .modal{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);padding:24px;align-items:center;justify-content:center}.modal.open{display:flex}.modal-card{width:min(920px,100%);max-height:92vh;background:#11151b;border:1px solid #2b333e;border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45)}.modal-head{height:56px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #252c35}.modal-head h3{margin:0;font-size:13px}.modal-head p{margin:3px 0 0;color:#727d8d;font-size:10px}.icon-btn{width:32px;height:32px;border:1px solid #2c3440;border-radius:8px;background:#141922;display:grid;place-items:center;cursor:pointer}.modal-body{padding:14px;background:#e9e9e9;overflow:auto;max-height:calc(92vh - 56px)}.modal-body img{display:block;max-width:100%;height:auto;margin:0 auto;background:#fff}
+    .mobile-note{display:none;color:#778295;font-size:10px;padding:0 4px 10px}
+    @media (max-width:1100px){.app-grid{grid-template-columns:1fr}.side{position:static;max-height:none}.side-content{max-height:none}.toolbar-hint{display:none}.side-card{max-width:none}}
+    @media (max-width:720px){.shell{padding:0 12px}.topbar{height:auto}.topbar-inner{padding:10px 0;align-items:flex-start}.brand p{display:none}.top-actions{gap:6px}.btn{height:34px;padding:0 10px}.btn .btn-label.optional{display:none}.app-grid{padding-top:12px}.toolbar{align-items:flex-start;flex-direction:column}.segments{width:100%}.statusbar{padding:0 11px}.stage-wrap{padding:8px}.mobile-note{display:block}.legend-note{width:100%;margin-left:0}}
+    @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}.node:hover{filter:none}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">86</div>
+        <div class="min-w-0">
+          <h1>8086 Architecture Lab</h1>
+          <p>Interactive internal block diagram • fetch, decode and execute</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="playBtn" class="btn primary" type="button" aria-label="Play automatic cycle">
+          <svg id="playIcon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6 4.6v10.8c0 .78.85 1.26 1.52.86l8.1-4.9a1 1 0 0 0 0-1.72l-8.1-4.9A1 1 0 0 0 6 4.6Z"/></svg>
+          <span id="playLabel">Auto cycle</span>
+        </button>
+        <button id="stepBtn" class="btn" type="button"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 4 6 6-6 6"/><path d="M14 4v12"/></svg><span>Step</span></button>
+        <button id="resetBtn" class="btn" type="button"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.3 7A6.4 6.4 0 1 1 4 12"/><path d="M4 3v4h4"/></svg><span>Reset</span></button>
+        <button id="refBtn" class="btn" type="button"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="m5.5 13 3-3 2.2 2.2 1.6-1.6 2.2 2.4"/></svg><span class="btn-label optional">Reference</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell app-grid">
+    <section class="card diagram-card">
+      <div class="toolbar">
+        <div class="segments" role="tablist" aria-label="Diagram filters">
+          <button class="seg active" data-filter="all" type="button">All</button>
+          <button class="seg" data-filter="biu" type="button">BIU</button>
+          <button class="seg" data-filter="eu" type="button">EU</button>
+          <button class="seg" data-filter="register" type="button">Registers</button>
+          <button class="seg" data-filter="bus" type="button">Buses</button>
+        </div>
+        <div class="toolbar-hint"><span>Click a component</span><span>•</span><span class="kbd">Space</span><span>play/pause</span><span class="kbd">→</span><span>step</span></div>
+      </div>
+
+      <div class="statusbar">
+        <span id="statusDot" class="status-dot"></span>
+        <div id="status"><span class="status-strong">Ready.</span> Select a component or start the instruction cycle.</div>
+      </div>
+
+      <div class="stage-wrap">
+        <div class="mobile-note">Diagram is wider than the screen. Swipe horizontally to inspect every block.</div>
+        <div class="stage">
+          <svg id="cpu" viewBox="0 0 1180 760" aria-label="Interactive 8086 internal block diagram" role="img">
+            <defs>
+              <linearGradient id="biuFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#111a20"/><stop offset="1" stop-color="#0e151b"/></linearGradient>
+              <linearGradient id="euFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#171520"/><stop offset="1" stop-color="#121119"/></linearGradient>
+              <marker id="arrowCyan" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#58c7dc"/></marker>
+              <marker id="arrowViolet" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#a88cf5"/></marker>
+              <marker id="arrowAmber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#f1c75b"/></marker>
+            </defs>
+
+            <g class="region" data-group="biu">
+              <rect x="24" y="112" width="1132" height="278" rx="18" fill="url(#biuFill)" stroke="#20343d" stroke-width="1.5"/>
+              <rect x="44" y="128" width="155" height="28" rx="8" fill="#10242b" stroke="#21434d"/>
+              <text x="121" y="147" fill="#84d6e5" font-size="12" font-weight="800" text-anchor="middle" letter-spacing=".4">BUS INTERFACE UNIT</text>
+            </g>
+            <g class="region" data-group="eu">
+              <rect x="24" y="408" width="1132" height="318" rx="18" fill="url(#euFill)" stroke="#322b47" stroke-width="1.5"/>
+              <rect x="44" y="424" width="135" height="28" rx="8" fill="#211c31" stroke="#3c3158"/>
+              <text x="111" y="443" fill="#c1b1f3" font-size="12" font-weight="800" text-anchor="middle" letter-spacing=".4">EXECUTION UNIT</text>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Memory interface" data-id="memory" data-group="biu" transform="translate(72 28)">
+              <rect width="230" height="68" rx="14" fill="#121821" stroke="#3e7380" stroke-width="2"/>
+              <text x="115" y="29" text-anchor="middle" fill="#edf3f7" font-size="15" font-weight="750">Memory Interface</text>
+              <text x="115" y="49" text-anchor="middle" fill="#758598" font-size="10.5">20-bit address • 16-bit data</text>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Physical address adder" data-id="adder" data-group="biu" transform="translate(92 183)">
+              <path d="M18 0 H176 L196 39 L176 78 H18 L0 39 Z" fill="#111820" stroke="#3e7380" stroke-width="2"/>
+              <text x="98" y="35" text-anchor="middle" fill="#ecf2f6" font-size="20" font-weight="750">Σ</text>
+              <text x="98" y="56" text-anchor="middle" fill="#76bcca" font-size="10.5">Physical address adder</text>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Segment registers" data-id="segments" data-group="register" transform="translate(72 279)">
+              <rect width="245" height="96" rx="11" fill="#111820" stroke="#3e7380" stroke-width="2"/>
+              <g font-size="12.5" font-weight="700">
+                <text x="20" y="23" fill="#e6edf3">ES</text><text x="62" y="23" fill="#6e7d90" font-weight="500">Extra Segment</text>
+                <text x="20" y="45" fill="#e6edf3">CS</text><text x="62" y="45" fill="#6e7d90" font-weight="500">Code Segment</text>
+                <text x="20" y="67" fill="#e6edf3">SS</text><text x="62" y="67" fill="#6e7d90" font-weight="500">Stack Segment</text>
+                <text x="20" y="89" fill="#e6edf3">DS</text><text x="62" y="89" fill="#6e7d90" font-weight="500">Data Segment</text>
+              </g>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Instruction pointer" data-id="ip" data-group="register" transform="translate(334 303)">
+              <rect width="124" height="52" rx="10" fill="#111820" stroke="#3e7380" stroke-width="2"/>
+              <text x="62" y="22" text-anchor="middle" fill="#eef3f8" font-size="15" font-weight="800">IP</text>
+              <text x="62" y="39" text-anchor="middle" fill="#708095" font-size="9.5">Instruction Pointer</text>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Six-byte instruction queue" data-id="queue" data-group="biu" transform="translate(704 174)">
+              <rect width="194" height="198" rx="12" fill="#111820" stroke="#3e7380" stroke-width="2"/>
+              <text x="97" y="24" text-anchor="middle" fill="#9bdde8" font-size="11.5" font-weight="800">6-BYTE INSTRUCTION QUEUE</text>
+              <g id="queueSlots">
+                <g class="queue-slot" data-slot="6"><rect x="25" y="39" width="144" height="23" rx="5" fill="#10242b" stroke="#21434d"/><text x="97" y="55" text-anchor="middle" fill="#79bcc8" font-size="11">6</text></g>
+                <g class="queue-slot" data-slot="5"><rect x="25" y="65" width="144" height="23" rx="5" fill="#10242b" stroke="#21434d"/><text x="97" y="81" text-anchor="middle" fill="#79bcc8" font-size="11">5</text></g>
+                <g class="queue-slot" data-slot="4"><rect x="25" y="91" width="144" height="23" rx="5" fill="#10242b" stroke="#21434d"/><text x="97" y="107" text-anchor="middle" fill="#79bcc8" font-size="11">4</text></g>
+                <g class="queue-slot" data-slot="3"><rect x="25" y="117" width="144" height="23" rx="5" fill="#10242b" stroke="#21434d"/><text x="97" y="133" text-anchor="middle" fill="#79bcc8" font-size="11">3</text></g>
+                <g class="queue-slot" data-slot="2"><rect x="25" y="143" width="144" height="23" rx="5" fill="#10242b" stroke="#21434d"/><text x="97" y="159" text-anchor="middle" fill="#79bcc8" font-size="11">2</text></g>
+                <g class="queue-slot" data-slot="1"><rect x="25" y="169" width="144" height="23" rx="5" fill="#10242b" stroke="#21434d"/><text x="97" y="185" text-anchor="middle" fill="#79bcc8" font-size="11">1</text></g>
+              </g>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Control system" data-id="control" data-group="eu" transform="translate(932 250)">
+              <rect width="176" height="84" rx="12" fill="#15131d" stroke="#5c4d8b" stroke-width="2"/>
+              <text x="88" y="35" text-anchor="middle" fill="#f0ecff" font-size="15" font-weight="800">Control System</text>
+              <text x="88" y="56" text-anchor="middle" fill="#9a86d8" font-size="10.5">Decode + sequencing</text>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="General pointer and index registers" data-id="registers" data-group="register" transform="translate(70 500)">
+              <rect width="305" height="190" rx="12" fill="#15131d" stroke="#5c4d8b" stroke-width="2"/>
+              <text x="152" y="24" text-anchor="middle" fill="#c8baf5" font-size="11.5" font-weight="800">GENERAL • POINTER • INDEX REGISTERS</text>
+              <line x1="152" x2="152" y1="38" y2="125" stroke="#2d2938"/>
+              <g fill="#e8e3f6" font-size="12.5" font-weight="750">
+                <text x="38" y="59">AH</text><text x="190" y="59">AL</text>
+                <text x="38" y="81">BH</text><text x="190" y="81">BL</text>
+                <text x="38" y="103">CH</text><text x="190" y="103">CL</text>
+                <text x="38" y="125">DH</text><text x="190" y="125">DL</text>
+                <text x="38" y="151">SP</text><text x="96" y="151">BP</text><text x="172" y="151">SI</text><text x="232" y="151">DI</text>
+              </g>
+              <text x="152" y="176" text-anchor="middle" fill="#746b8a" font-size="9.5">AX • BX • CX • DX • SP • BP • SI • DI</text>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Arithmetic logic unit" data-id="alu" data-group="eu" transform="translate(470 510)">
+              <path d="M0 0 H240 L208 72 L240 145 H0 L32 72 Z" fill="#15131d" stroke="#5c4d8b" stroke-width="2"/>
+              <text x="120" y="63" text-anchor="middle" fill="#f1eef8" font-size="18" font-weight="820">Arithmetic</text>
+              <text x="120" y="86" text-anchor="middle" fill="#f1eef8" font-size="18" font-weight="820">Logic Unit</text>
+              <text x="120" y="111" text-anchor="middle" fill="#907cc8" font-size="10.5">ADD • SUB • AND • OR • XOR • CMP</text>
+            </g>
+
+            <g class="node" tabindex="0" role="button" aria-label="Flags register" data-id="flags" data-group="register" transform="translate(500 670)">
+              <rect width="220" height="42" rx="9" fill="#18170f" stroke="#77672f" stroke-width="2"/>
+              <text x="110" y="18" text-anchor="middle" fill="#f3dd8a" font-size="12.5" font-weight="800">FLAGS REGISTER</text>
+              <text x="110" y="33" text-anchor="middle" fill="#8f7d42" font-size="8.5">CF PF AF ZF SF TF IF DF OF</text>
+            </g>
+
+            <g data-group="bus">
+              <path id="cBusPath" class="bus" d="M302 63 H800 V168" fill="none" stroke="#58c7dc" stroke-width="3.5" opacity=".58" marker-end="url(#arrowCyan)"/>
+              <text x="525" y="53" fill="#69b8c7" font-size="10.5" font-weight="800">C-BUS</text>
+            </g>
+            <g data-group="bus">
+              <path id="bBusPath" class="bus" d="M195 278 V263 M190 182 V101" fill="none" stroke="#58c7dc" stroke-width="3.5" opacity=".58" marker-end="url(#arrowCyan)"/>
+              <text x="128" y="273" fill="#69b8c7" font-size="10.5" font-weight="800">B-BUS</text>
+            </g>
+            <g data-group="bus">
+              <path id="aBusPath" class="bus" d="M375 575 H465 M710 580 H1030 V360 H899" fill="none" stroke="#a88cf5" stroke-width="3.5" opacity=".55" marker-end="url(#arrowViolet)"/>
+              <text x="399" y="563" fill="#a897dc" font-size="10.5" font-weight="800">A-BUS</text>
+            </g>
+            <g data-group="bus">
+              <path id="qToCtrl" class="bus" d="M801 372 V405 H1020 V340" fill="none" stroke="#f1c75b" stroke-width="3" opacity=".58" marker-end="url(#arrowAmber)"/>
+              <path id="ctrlToAlu" class="bus" d="M1020 334 V470 H590 V505" fill="none" stroke="#f1c75b" stroke-width="3" opacity=".58" marker-end="url(#arrowAmber)"/>
+              <path id="aluToFlags" class="bus" d="M590 655 V667" fill="none" stroke="#f1c75b" stroke-width="3" opacity=".58" marker-end="url(#arrowAmber)"/>
+              <path id="ipToAdder" class="bus" d="M334 329 H289 V223" fill="none" stroke="#58c7dc" stroke-width="3" opacity=".52" marker-end="url(#arrowCyan)"/>
+              <path id="segToAdder" class="bus" d="M195 279 V264" fill="none" stroke="#58c7dc" stroke-width="3" opacity=".52" marker-end="url(#arrowCyan)"/>
+              <path id="adderToMemory" class="bus" d="M190 183 V101" fill="none" stroke="#58c7dc" stroke-width="3" opacity=".52" marker-end="url(#arrowCyan)"/>
+              <path id="memoryToQueue" class="bus" d="M302 63 H801 V168" fill="none" stroke="#58c7dc" stroke-width="3" opacity=".48" marker-end="url(#arrowCyan)"/>
+            </g>
+            <g id="flowLayer"></g>
+          </svg>
+        </div>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="legend-line" style="background:#58c7dc"></span>BIU / memory path</span>
+        <span class="legend-item"><span class="legend-line" style="background:#a88cf5"></span>EU / operand path</span>
+        <span class="legend-item"><span class="legend-line" style="background:#f1c75b"></span>Control / flags</span>
+        <span class="legend-note">Animated overlays do not alter the diagram geometry.</span>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="side-card">
+        <div class="side-tabs" role="tablist">
+          <button class="side-tab active" data-panel="inspector" type="button">Inspector</button>
+          <button class="side-tab" data-panel="cycle" type="button">Cycle</button>
+          <button class="side-tab" data-panel="playground" type="button">Playground</button>
+        </div>
+        <div class="side-content">
+          <div id="panel-inspector" class="panel-view active">
+            <div class="eyebrow">Selected component</div>
+            <div class="title-row"><h2 id="detailTitle">8086 Architecture</h2><span id="groupPill" class="pill">Overview</span></div>
+            <p id="detailBody" class="detail-body">Select any block in the diagram to inspect its role, data width and place in the instruction cycle.</p>
+            <div id="detailFacts" class="facts">
+              <div class="fact">BIU handles fetching and external bus activity while the EU executes instructions.</div>
+              <div class="fact">Use Auto cycle to see the main internal data flow without changing the layout.</div>
+            </div>
+          </div>
+
+          <div id="panel-cycle" class="panel-view">
+            <div class="eyebrow">Instruction flow</div>
+            <div class="title-row"><h2>Fetch → Decode → Execute</h2><span class="pill">7 steps</span></div>
+            <p class="detail-body">Click any step to replay only that part of the cycle.</p>
+            <div id="steps" class="timeline" style="margin-top:12px"></div>
+          </div>
+
+          <div id="panel-playground" class="panel-view">
+            <div class="eyebrow">Mini simulator</div>
+            <div class="title-row"><h2>16-bit ADD</h2><span class="pill">Hex</span></div>
+            <p class="playground-intro">Add BX to AX and inspect the resulting 8086 status flags.</p>
+            <div class="input-grid">
+              <div class="field"><label for="ax">AX</label><input id="ax" value="001A" maxlength="4" inputmode="text" spellcheck="false" /></div>
+              <div class="field"><label for="bx">BX</label><input id="bx" value="0007" maxlength="4" inputmode="text" spellcheck="false" /></div>
+            </div>
+            <button id="addBtn" class="sim-btn" type="button">Run AX = AX + BX</button>
+            <div class="result-grid">
+              <div class="result-box"><span class="result-label">Result</span><span id="sum" class="result-value">0021</span></div>
+              <div class="result-box"><span class="result-label">Flags</span><span id="flagOut" class="result-value flag-value">CF 0 · PF 1 · AF 1 · ZF 0 · SF 0 · OF 0</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="refModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="refTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div><h3 id="refTitle">Original 8086 block diagram</h3><p>Reference supplied with the project.</p></div>
+        <button id="closeRef" class="icon-btn" type="button" aria-label="Close reference">×</button>
+      </div>
+      <div class="modal-body"><img src="../assets/8086-architecture-reference.svg" alt="8086 internal architecture learning reference" /></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = (s, root=document) => root.querySelector(s);
+  const $$ = (s, root=document) => Array.from(root.querySelectorAll(s));
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const info = {
+    memory:{title:'Memory Interface',group:'BIU',body:'Connects the 8086 to external memory and I/O. The Bus Interface Unit performs instruction fetches, memory reads/writes and I/O transfers.',facts:['20-bit address bus gives the 8086 a 1 MB address space.','External data path is 16 bits wide.','The BIU can prefetch instruction bytes while the EU is busy.']},
+    adder:{title:'Physical Address Adder',group:'BIU',body:'Forms a 20-bit physical address from a 16-bit segment value and a 16-bit offset.',facts:['Physical address = segment × 16 + offset.','Offsets may come from IP, SP, BP, SI, DI or an effective address.','This hardware supports the 8086 segmented memory model.']},
+    segments:{title:'Segment Registers',group:'Registers',body:'Four 16-bit segment registers select the active code, data, stack and extra-data regions.',facts:['CS — Code Segment','DS — Data Segment','SS — Stack Segment','ES — Extra Segment']},
+    ip:{title:'Instruction Pointer',group:'Register',body:'Stores the 16-bit offset of the next instruction inside the current code segment.',facts:['Instruction fetch normally uses CS:IP.','IP advances as instruction bytes are consumed.','Jumps, calls, returns and interrupts can replace IP and flush the queue.']},
+    queue:{title:'6-Byte Instruction Queue',group:'BIU',body:'A FIFO prefetch buffer that lets the BIU fetch upcoming instruction bytes while the EU works on the current instruction.',facts:['Maximum capacity is six bytes.','The BIU fills it whenever bus time is available.','A control transfer to a new instruction stream flushes prefetched bytes.']},
+    control:{title:'Control System',group:'EU',body:'Consumes instruction bytes, decodes them and generates the internal control signals required for each micro-operation.',facts:['Reads opcodes and operand information from the queue.','Coordinates register transfers and ALU activity.','Sequences multi-step instructions.']},
+    registers:{title:'General, Pointer & Index Registers',group:'Registers',body:'The EU contains general-purpose, stack and index registers used as operands, addresses and counters.',facts:['AX, BX, CX and DX are 16-bit and also expose high/low 8-bit halves.','SP and BP are primarily stack-related.','SI and DI are heavily used by indexed and string operations.']},
+    alu:{title:'Arithmetic Logic Unit',group:'EU',body:'Performs arithmetic, logic, compare and related operations on operands supplied by the Execution Unit.',facts:['Typical operations include ADD, SUB, ADC, SBB, AND, OR, XOR and CMP.','Results can return to registers or memory.','Arithmetic and logic operations update relevant status flags.']},
+    flags:{title:'FLAGS Register',group:'Register',body:'Stores status and control bits that describe results and influence execution behavior.',facts:['Status flags: CF, PF, AF, ZF, SF and OF.','Control flags: TF, IF and DF.','Conditional instructions test status flags.']}
+  };
+
+  const stepsData = [
+    {name:'Form fetch address',desc:'CS and IP feed the physical-address adder.',target:'adder',paths:['segToAdder','ipToAdder'],color:'#58c7dc'},
+    {name:'Fetch instruction bytes',desc:'The BIU accesses memory through the memory interface.',target:'memory',paths:['adderToMemory'],color:'#58c7dc'},
+    {name:'Prefetch into queue',desc:'Fetched bytes are placed in the 6-byte instruction queue.',target:'queue',paths:['memoryToQueue'],color:'#58c7dc',queue:'fill'},
+    {name:'Decode instruction',desc:'The control system consumes bytes from the queue.',target:'control',paths:['qToCtrl'],color:'#f1c75b',queue:'consume'},
+    {name:'Read operands',desc:'EU registers place operands onto the internal A-bus.',target:'registers',paths:['aBusPath'],color:'#a88cf5'},
+    {name:'Execute in ALU',desc:'The arithmetic/logic operation is performed.',target:'alu',paths:['ctrlToAlu'],color:'#f1c75b'},
+    {name:'Write result + flags',desc:'The result is written back and status flags are updated.',target:'flags',paths:['aluToFlags'],color:'#f1c75b'}
+  ];
+
+  let step = -1;
+  let playing = false;
+  let cycleTimeout = null;
+  let flowTweens = [];
+  const cycleDelay = 2300;
+
+  function setStatus(title, text='', running=false){
+    $('#status').innerHTML = `<span class="status-strong">${title}</span>${text ? ` ${text}` : ''}`;
+    $('#statusDot').classList.toggle('running', running);
+  }
+
+  function switchPanel(name){
+    $$('.side-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === name));
+    $$('.panel-view').forEach(p => p.classList.toggle('active', p.id === `panel-${name}`));
+  }
+
+  function showDetails(id, openInspector=true){
+    const d = info[id];
+    if(!d) return;
+    $('#detailTitle').textContent = d.title;
+    $('#detailBody').textContent = d.body;
+    $('#groupPill').textContent = d.group;
+    $('#detailFacts').innerHTML = d.facts.map(x => `<div class="fact">${x}</div>`).join('');
+    $$('.node').forEach(n => n.classList.toggle('is-active', n.dataset.id === id));
+    if(openInspector) switchPanel('inspector');
+  }
+
+  function renderSteps(){
+    $('#steps').innerHTML = stepsData.map((s,i) => `
+      <button class="step-item ${i===step?'active':''}" data-step="${i}" type="button">
+        <span class="step-num">${i+1}</span>
+        <span><span class="step-name">${s.name}</span><span class="step-desc">${s.desc}</span></span>
+      </button>`).join('');
+    $$('.step-item').forEach(b => b.addEventListener('click', () => {
+      if(playing) pauseCycle();
+      runStep(Number(b.dataset.step), false);
+    }));
+  }
+
+  function clearFlowAnimations(){
+    flowTweens.forEach(t => t && t.kill && t.kill());
+    flowTweens = [];
+    $('#flowLayer').replaceChildren();
+  }
+
+  function animatePath(pathId, color){
+    const source = document.getElementById(pathId);
+    if(!source) return;
+    const layer = $('#flowLayer');
+    const ns = 'http://www.w3.org/2000/svg';
+    const overlay = document.createElementNS(ns,'path');
+    overlay.setAttribute('d', source.getAttribute('d'));
+    overlay.setAttribute('class','flow-path');
+    overlay.setAttribute('fill','none');
+    overlay.setAttribute('stroke',color);
+    overlay.setAttribute('stroke-width','5');
+    overlay.setAttribute('stroke-dasharray','13 16');
+    overlay.setAttribute('opacity','0.95');
+    layer.appendChild(overlay);
+
+    if(reducedMotion){
+      overlay.setAttribute('opacity','.9');
+      setTimeout(() => overlay.remove(), 700);
+      return;
+    }
+
+    const dashTween = gsap.fromTo(overlay,{strokeDashoffset:0,opacity:.18},{strokeDashoffset:-90,opacity:.95,duration:1.2,ease:'none',repeat:1,onComplete:()=>gsap.to(overlay,{opacity:0,duration:.25,onComplete:()=>overlay.remove()})});
+    flowTweens.push(dashTween);
+
+    try{
+      const dot = document.createElementNS(ns,'circle');
+      dot.setAttribute('r','5.5');
+      dot.setAttribute('fill',color);
+      dot.setAttribute('class','flow-dot');
+      layer.appendChild(dot);
+      const length = source.getTotalLength();
+      const progress = {v:0};
+      const dotTween = gsap.to(progress,{v:1,duration:1.15,ease:'power1.inOut',onUpdate:()=>{
+        const pt = source.getPointAtLength(length*progress.v);
+        dot.setAttribute('cx',pt.x);dot.setAttribute('cy',pt.y);
+      },onComplete:()=>gsap.to(dot,{opacity:0,duration:.18,onComplete:()=>dot.remove()})});
+      flowTweens.push(dotTween);
+    }catch(e){}
+  }
+
+  function resetQueue(){
+    $$('.queue-slot rect').forEach(r => { gsap.killTweensOf(r); gsap.set(r,{attr:{fill:'#10242b',stroke:'#21434d'}}); });
+  }
+
+  function animateQueue(mode){
+    const slots = $$('.queue-slot rect');
+    if(mode==='fill'){
+      resetQueue();
+      slots.slice().reverse().forEach((r,i)=>gsap.to(r,{attr:{fill:'#16343d',stroke:'#3f7783'},duration:.18,delay:i*.07,yoyo:true,repeat:1}));
+    } else if(mode==='consume'){
+      slots.slice(-3).reverse().forEach((r,i)=>gsap.to(r,{attr:{fill:'#2c2613',stroke:'#7a672e'},duration:.18,delay:i*.08,yoyo:true,repeat:1}));
+    }
+  }
+
+  function runStep(index, switchToCycle=true){
+    const normalized = ((index % stepsData.length) + stepsData.length) % stepsData.length;
+    step = normalized;
+    const s = stepsData[step];
+    clearFlowAnimations();
+    renderSteps();
+    showDetails(s.target, false);
+    if(switchToCycle) switchPanel('cycle');
+    setStatus(`${step+1}. ${s.name}.`, s.desc, playing);
+    s.paths.forEach(id => animatePath(id, s.color));
+    if(s.queue) animateQueue(s.queue);
+  }
+
+  function scheduleNext(){
+    clearTimeout(cycleTimeout);
+    if(!playing) return;
+    cycleTimeout = setTimeout(() => {
+      runStep(step+1, true);
+      scheduleNext();
+    }, cycleDelay);
+  }
+
+  function playCycle(){
+    if(playing) return;
+    playing = true;
+    $('#playLabel').textContent = 'Pause';
+    $('#playIcon').innerHTML = '<path d="M5.8 4.5h2.5v11H5.8zm5.9 0h2.5v11h-2.5z"/>';
+    runStep(step+1, true);
+    setStatus(`${step+1}. ${stepsData[step].name}.`, stepsData[step].desc, true);
+    scheduleNext();
+  }
+
+  function pauseCycle(){
+    playing = false;
+    clearTimeout(cycleTimeout);
+    cycleTimeout = null;
+    $('#playLabel').textContent = 'Auto cycle';
+    $('#playIcon').innerHTML = '<path d="M6 4.6v10.8c0 .78.85 1.26 1.52.86l8.1-4.9a1 1 0 0 0 0-1.72l-8.1-4.9A1 1 0 0 0 6 4.6Z"/>';
+    if(step >= 0) setStatus(`${step+1}. ${stepsData[step].name}.`, 'Paused.', false);
+    else setStatus('Ready.','Select a component or start the instruction cycle.',false);
+  }
+
+  function togglePlay(){ playing ? pauseCycle() : playCycle(); }
+
+  function resetAll(){
+    pauseCycle();
+    clearFlowAnimations();
+    resetQueue();
+    step = -1;
+    $$('.node').forEach(n => n.classList.remove('is-active'));
+    $$('.seg').forEach(x => x.classList.toggle('active', x.dataset.filter==='all'));
+    $$('[data-group]').forEach(el => gsap.set(el,{opacity:1}));
+    $('#detailTitle').textContent='8086 Architecture';
+    $('#detailBody').textContent='Select any block in the diagram to inspect its role, data width and place in the instruction cycle.';
+    $('#groupPill').textContent='Overview';
+    $('#detailFacts').innerHTML='<div class="fact">BIU handles fetching and external bus activity while the EU executes instructions.</div><div class="fact">Use Auto cycle to see the main internal data flow without changing the layout.</div>';
+    renderSteps();
+    switchPanel('inspector');
+    setStatus('Ready.','Select a component or start the instruction cycle.',false);
+  }
+
+  function cleanHex(v){ return (v || '0').replace(/[^0-9a-f]/gi,'').slice(0,4).toUpperCase() || '0'; }
+  function parityEven8(v){ let bits = v & 0xff, ones = 0; for(let i=0;i<8;i++) ones += (bits>>i)&1; return ones%2===0 ? 1 : 0; }
+
+  function simulateAdd(){
+    const axVal = cleanHex($('#ax').value).padStart(4,'0');
+    const bxVal = cleanHex($('#bx').value).padStart(4,'0');
+    $('#ax').value=axVal; $('#bx').value=bxVal;
+    const a=parseInt(axVal,16), b=parseInt(bxVal,16), raw=a+b, res=raw & 0xFFFF;
+    const cf=raw>0xFFFF?1:0, pf=parityEven8(res), af=((a&0xF)+(b&0xF))>0xF?1:0, zf=res===0?1:0, sf=(res>>>15)&1;
+    const of=((~(a^b)&(a^res)&0x8000)!==0)?1:0;
+    const hex=res.toString(16).toUpperCase().padStart(4,'0');
+    $('#sum').textContent=hex;
+    $('#flagOut').textContent=`CF ${cf} · PF ${pf} · AF ${af} · ZF ${zf} · SF ${sf} · OF ${of}`;
+    pauseCycle();
+    clearFlowAnimations();
+    showDetails('alu', false);
+    animatePath('aBusPath','#a88cf5');
+    setTimeout(()=>animatePath('aluToFlags','#f1c75b'), reducedMotion?0:420);
+    setStatus('ADD complete.', `${axVal}h + ${bxVal}h = ${hex}h.`, false);
+  }
+
+  $$('.node').forEach(node => {
+    const activate = () => { if(playing) pauseCycle(); showDetails(node.dataset.id, true); setStatus(info[node.dataset.id].title + '.', 'Component selected.', false); };
+    node.addEventListener('click', activate);
+    node.addEventListener('keydown', e => { if(e.key==='Enter' || e.key===' '){ e.preventDefault(); activate(); } });
+  });
+
+  $$('.seg').forEach(tab => tab.addEventListener('click', () => {
+    $$('.seg').forEach(x => x.classList.remove('active')); tab.classList.add('active');
+    const filter=tab.dataset.filter;
+    $$('[data-group]').forEach(el => {
+      const group=(el.dataset.group || '').toLowerCase();
+      const match=filter==='all' || group.includes(filter);
+      gsap.to(el,{opacity:match?1:.12,duration:reducedMotion?0:.18,overwrite:true});
+    });
+  }));
+
+  $$('.side-tab').forEach(tab => tab.addEventListener('click',()=>switchPanel(tab.dataset.panel)));
+  $('#playBtn').addEventListener('click',togglePlay);
+  $('#stepBtn').addEventListener('click',()=>{ pauseCycle(); runStep(step+1,true); });
+  $('#resetBtn').addEventListener('click',resetAll);
+  $('#addBtn').addEventListener('click',simulateAdd);
+
+  const modal=$('#refModal');
+  $('#refBtn').addEventListener('click',()=>{ modal.classList.add('open'); $('#closeRef').focus(); });
+  $('#closeRef').addEventListener('click',()=>modal.classList.remove('open'));
+  modal.addEventListener('click',e=>{ if(e.target===modal) modal.classList.remove('open'); });
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape' && modal.classList.contains('open')) { modal.classList.remove('open'); return; }
+    if(document.activeElement && ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+    if(e.code==='Space'){e.preventDefault();togglePlay();}
+    if(e.key==='ArrowRight'){e.preventDefault();pauseCycle();runStep(step+1,true);}
+    if(e.key==='ArrowLeft'){e.preventDefault();pauseCycle();runStep(step-1,true);}
+  });
+
+  renderSteps();
+  resetQueue();
+})();
+</script>
+</body>
+</html>

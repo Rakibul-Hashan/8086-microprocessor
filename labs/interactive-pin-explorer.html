@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#071018]">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Interactive 3D Intel 8086 microprocessor pin explorer built with Tailwind CSS and Three.js." />
+  <title>8086 Interactive 3D Pin Explorer</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: {
+            glow: '0 0 40px rgba(34,211,238,.12)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow-x: hidden; }
+    #scene { touch-action: none; }
+    .glass { background: rgba(10, 22, 32, .76); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(148,163,184,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,.045) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(to bottom, black, transparent 95%);
+    }
+    .pin-row { transition: border-color .2s ease, background-color .2s ease, transform .2s ease; }
+    .pin-row:hover { transform: translateX(2px); }
+    .pin-row.active { border-color: rgba(34,211,238,.55); background: rgba(34,211,238,.08); }
+    .mono-num { font-variant-numeric: tabular-nums; }
+    .scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scrollbar::-webkit-scrollbar-thumb { background: rgba(148,163,184,.25); border-radius: 999px; }
+    .scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .soft-ring { box-shadow: inset 0 0 0 1px rgba(148,163,184,.12); }
+    .chip-badge { box-shadow: 0 0 28px rgba(34,211,238,.16); }
+    .kbd { border: 1px solid rgba(148,163,184,.25); border-bottom-width: 2px; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body class="min-h-full bg-[#071018] text-slate-100 antialiased selection:bg-cyan-400/30 selection:text-white">
+  <div class="pointer-events-none fixed inset-0 grid-bg"></div>
+  <div class="pointer-events-none fixed -left-44 top-[-180px] h-[520px] w-[520px] rounded-full bg-cyan-400/10 blur-[130px]"></div>
+  <div class="pointer-events-none fixed -right-44 bottom-[-180px] h-[520px] w-[520px] rounded-full bg-violet-500/10 blur-[140px]"></div>
+
+  <main class="relative mx-auto flex min-h-screen max-w-[1800px] flex-col px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+    <header class="mb-4 flex flex-col gap-4 rounded-3xl border border-white/10 glass px-5 py-4 shadow-glow lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex items-center gap-4">
+        <div class="chip-badge flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 font-black text-cyan-200">86</div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight sm:text-2xl">8086 Interactive 3D Explorer</h1>
+            <span class="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.18em] text-emerald-200">40-pin DIP</span>
+          </div>
+          <p class="mt-1 text-sm text-slate-400">Orbit the processor, click any physical pin, switch modes, and inspect its electrical role.</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="modeMin" class="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3.5 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/15">Minimum mode</button>
+        <button id="modeMax" class="rounded-xl border border-white/10 bg-white/[.035] px-3.5 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.07]">Maximum mode</button>
+        <button id="resetCamera" class="rounded-xl border border-white/10 bg-white/[.035] px-3.5 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.07]">Reset view</button>
+      </div>
+    </header>
+
+    <section class="grid flex-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
+      <!-- PIN INDEX -->
+      <aside class="order-2 flex min-h-0 flex-col rounded-3xl border border-white/10 glass p-4 xl:order-1 xl:h-[calc(100vh-132px)]">
+        <div class="mb-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[.2em] text-cyan-300/80">Pin index</p>
+              <p class="mt-1 text-sm text-slate-400">Search all 40 pins</p>
+            </div>
+            <span id="resultCount" class="rounded-full bg-white/[.05] px-2.5 py-1 text-xs text-slate-400">40</span>
+          </div>
+          <label class="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5 focus-within:border-cyan-300/30">
+            <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 fill-none stroke-slate-500" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <input id="pinSearch" class="w-full bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-600" placeholder="Pin, signal, function…" />
+            <span class="kbd hidden rounded-md px-1.5 py-0.5 text-[10px] text-slate-500 sm:inline">/</span>
+          </label>
+        </div>
+
+        <div id="pinList" class="scrollbar min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1"></div>
+
+        <div class="mt-3 rounded-2xl border border-white/10 bg-white/[.025] p-3 text-xs leading-5 text-slate-500">
+          <span class="font-semibold text-slate-300">Notation:</span> <span class="text-cyan-200">#</span> means active-low. AD pins are multiplexed address/data lines.
+        </div>
+      </aside>
+
+      <!-- 3D VIEWPORT -->
+      <section class="order-1 relative min-h-[560px] overflow-hidden rounded-3xl border border-white/10 bg-[#08141e]/90 shadow-glow xl:order-2 xl:h-[calc(100vh-132px)] xl:min-h-0">
+        <canvas id="scene" class="absolute inset-0 h-full w-full"></canvas>
+
+        <div class="pointer-events-none absolute left-4 top-4 flex flex-col gap-2 sm:left-5 sm:top-5">
+          <div class="w-fit rounded-2xl border border-white/10 bg-black/35 px-3 py-2 text-xs text-slate-300 backdrop-blur-xl">
+            <span class="text-slate-500">MODE</span>
+            <span id="sceneMode" class="ml-2 font-bold text-cyan-200">MINIMUM</span>
+          </div>
+          <div class="hidden w-fit rounded-2xl border border-white/10 bg-black/35 px-3 py-2 text-xs text-slate-400 backdrop-blur-xl sm:block">
+            Drag to orbit · Wheel to zoom · Click a pin
+          </div>
+        </div>
+
+        <div class="absolute right-4 top-4 flex flex-col gap-2 sm:right-5 sm:top-5">
+          <button id="toggleRotate" class="rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-xs font-semibold text-slate-300 backdrop-blur-xl transition hover:border-cyan-300/25 hover:text-cyan-100">Auto rotate: On</button>
+          <button id="toggleLabels" class="rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-xs font-semibold text-slate-300 backdrop-blur-xl transition hover:border-cyan-300/25 hover:text-cyan-100">Pin numbers: On</button>
+        </div>
+
+        <div class="absolute bottom-4 left-4 right-4 flex flex-wrap items-end justify-between gap-3 sm:bottom-5 sm:left-5 sm:right-5">
+          <div class="max-w-lg rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-xs leading-5 text-slate-400 backdrop-blur-xl">
+            <span class="font-semibold text-slate-200">3D package orientation:</span> pin 1 begins beside the notch, numbering runs counter-clockwise around the DIP package.
+          </div>
+          <button id="referenceBtn" class="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs font-semibold text-slate-300 backdrop-blur-xl transition hover:border-cyan-300/25 hover:text-cyan-100">Reference pinout</button>
+        </div>
+      </section>
+
+      <!-- DETAILS -->
+      <aside class="order-3 flex min-h-0 flex-col rounded-3xl border border-white/10 glass p-5 xl:h-[calc(100vh-132px)]">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-[.2em] text-cyan-300/80">Selected pin</p>
+            <div class="mt-2 flex items-center gap-3">
+              <span id="pinNumber" class="mono-num flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-lg font-black text-cyan-100">1</span>
+              <div>
+                <h2 id="pinName" class="text-xl font-bold">GND</h2>
+                <p id="pinAlt" class="mt-0.5 text-xs text-slate-500">VSS · Ground</p>
+              </div>
+            </div>
+          </div>
+          <span id="pinCategory" class="rounded-full border border-slate-300/15 bg-slate-300/10 px-2.5 py-1 text-[11px] font-semibold text-slate-300">Power</span>
+        </div>
+
+        <div class="mt-5 grid grid-cols-2 gap-2">
+          <div class="rounded-2xl border border-white/10 bg-black/20 p-3">
+            <p class="text-[10px] font-bold uppercase tracking-[.16em] text-slate-600">Direction</p>
+            <p id="pinDirection" class="mt-1 text-sm font-semibold text-slate-200">Supply</p>
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-black/20 p-3">
+            <p class="text-[10px] font-bold uppercase tracking-[.16em] text-slate-600">Mode</p>
+            <p id="pinMode" class="mt-1 text-sm font-semibold text-slate-200">Both</p>
+          </div>
+        </div>
+
+        <div class="scrollbar mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div class="rounded-2xl border border-white/10 bg-white/[.025] p-4">
+            <p class="text-xs font-bold uppercase tracking-[.16em] text-slate-500">What it does</p>
+            <p id="pinSummary" class="mt-2 text-sm leading-6 text-slate-300"></p>
+          </div>
+
+          <div class="mt-3 rounded-2xl border border-white/10 bg-white/[.025] p-4">
+            <p class="text-xs font-bold uppercase tracking-[.16em] text-slate-500">Detailed behavior</p>
+            <p id="pinDetails" class="mt-2 text-sm leading-6 text-slate-400"></p>
+          </div>
+
+          <div id="modeNoteWrap" class="mt-3 rounded-2xl border border-violet-300/15 bg-violet-300/[.06] p-4">
+            <p class="text-xs font-bold uppercase tracking-[.16em] text-violet-300/75">Mode-specific note</p>
+            <p id="modeNote" class="mt-2 text-sm leading-6 text-violet-100/80"></p>
+          </div>
+
+          <div class="mt-3 rounded-2xl border border-white/10 bg-white/[.025] p-4">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-xs font-bold uppercase tracking-[.16em] text-slate-500">Related pins</p>
+              <button id="nextPin" class="text-xs font-semibold text-cyan-300 hover:text-cyan-200">Next pin →</button>
+            </div>
+            <div id="relatedPins" class="mt-3 flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="mt-4 flex flex-col gap-2 px-1 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      <p>Educational visualization of the standard Intel 8086 40-pin DIP interface.</p>
+      <p>Built with plain HTML + Tailwind CSS + Three.js.</p>
+    </footer>
+  </main>
+
+  <!-- Reference modal -->
+  <div id="referenceModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="8086 reference pinout">
+    <div class="relative max-h-[92vh] w-full max-w-xl overflow-auto rounded-3xl border border-white/10 bg-[#0b1721] p-4 shadow-2xl sm:p-5">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 class="font-bold text-slate-100">Original pinout reference</h3>
+          <p class="mt-1 text-xs text-slate-500">The image you supplied, kept beside the interactive model.</p>
+        </div>
+        <button id="closeReference" class="rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-sm text-slate-300 hover:bg-white/[.08]">Close</button>
+      </div>
+      <div class="flex justify-center rounded-2xl border border-white/10 bg-white p-3">
+        <img src="assets/8086-pinout-reference.png" alt="8086 pinout reference" class="max-h-[72vh] w-auto max-w-full object-contain" />
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ------------------------------
+    // Pin data
+    // ------------------------------
+    const pins = [];
+
+    const addPin = (p) => pins.push({
+      alt: '',
+      category: 'Control',
+      direction: '—',
+      mode: 'Both',
+      summary: '',
+      details: '',
+      modeNote: '',
+      related: [],
+      minName: null,
+      maxName: null,
+      minSummary: null,
+      maxSummary: null,
+      minDetails: null,
+      maxDetails: null,
+      ...p
+    });
+
+    addPin({ n:1, name:'GND', alt:'VSS · Ground', category:'Power', direction:'Supply', summary:'Ground reference for the processor.', details:'Connects the 8086 to the system 0 V reference. The package provides two ground pins, at pins 1 and 20, to improve current return paths and signal integrity.', related:[20,40] });
+
+    for (let n = 2; n <= 8; n++) {
+      const bit = 16 - n; // 14..8
+      addPin({ n, name:`AD${bit}`, alt:`Address/Data bit ${bit}`, category:'Address / Data', direction:'Bidirectional', summary:`Multiplexed address/data line AD${bit}.`, details:`During T1, this line carries address bit A${bit}. During later bus states it becomes data bit D${bit}. External latches use ALE to preserve the address while the same physical line is reused for data.`, related:[25,32,39] });
+    }
+    for (let n = 9; n <= 16; n++) {
+      const bit = 16 - n; // 7..0
+      addPin({ n, name:`AD${bit}`, alt:`Address/Data bit ${bit}`, category:'Address / Data', direction:'Bidirectional', summary:`Multiplexed address/data line AD${bit}.`, details:`During T1, this line carries address bit A${bit}. During later bus states it becomes data bit D${bit}. Because the 8086 multiplexes address and data, the low-order address is normally latched externally using ALE.`, related:[25,32,39] });
+    }
+
+    addPin({ n:17, name:'NMI', alt:'Non-Maskable Interrupt', category:'Interrupt', direction:'Input', summary:'High-priority interrupt input that is not controlled by the Interrupt Flag.', details:'NMI is edge-triggered and is intended for urgent events such as serious hardware faults. A recognized NMI transfers control through interrupt type 2.', related:[18,24] });
+    addPin({ n:18, name:'INTR', alt:'Interrupt Request', category:'Interrupt', direction:'Input', summary:'Maskable hardware interrupt request input.', details:'INTR is level-sensitive. It is serviced when interrupts are enabled by the IF flag. In minimum mode the processor answers an accepted request with the INTA# signal on pin 24.', related:[17,24] });
+    addPin({ n:19, name:'CLK', alt:'Clock', category:'Timing', direction:'Input', summary:'Clock input that establishes the processor bus and execution timing.', details:'The 8086 is commonly driven by an 8284A clock generator. Internal operations and external bus states are synchronized to this clock.', related:[21,22] });
+    addPin({ n:20, name:'GND', alt:'VSS · Ground', category:'Power', direction:'Supply', summary:'Second ground reference pin.', details:'This second VSS connection provides another return path for internal switching currents. Both ground pins should be connected to the system ground plane.', related:[1,40] });
+    addPin({ n:21, name:'RESET', alt:'Reset', category:'Control', direction:'Input', summary:'Active-high processor reset input.', details:'A valid reset initializes the CPU and restarts instruction fetching from physical address FFFF0h (CS=FFFFh, IP=0000h). System logic must hold RESET active long enough for the clocked reset sequence to be recognized.', related:[19,22] });
+    addPin({ n:22, name:'READY', alt:'Ready / Wait-state control', category:'Control', direction:'Input', summary:'Lets slower memory or I/O stretch a bus cycle.', details:'When READY is not asserted at the sampling point, the 8086 inserts wait states until the external device indicates that the transfer can complete.', related:[19,23,32] });
+    addPin({ n:23, name:'TEST', alt:'WAIT synchronization input', category:'Control', direction:'Input', summary:'Input examined by the WAIT instruction.', details:'WAIT repeatedly tests this input. The processor can idle while TEST remains asserted in the wait condition, allowing software to synchronize with external hardware such as a coprocessor.', related:[19,22] });
+
+    addPin({
+      n:24, name:'INTA# / QS1', minName:'INTA#', maxName:'QS1', alt:'Interrupt acknowledge / Queue status 1', category:'Mode Multiplexed', direction:'Output', mode:'Min / Max',
+      minSummary:'Interrupt acknowledge strobe for an accepted INTR request.', maxSummary:'Instruction queue status bit QS1.',
+      minDetails:'In minimum mode, INTA# goes low during the interrupt-acknowledge bus sequence so an interrupt controller or peripheral can place an interrupt type on the data bus.',
+      maxDetails:'In maximum mode, QS1 combines with QS0 on pin 25 to report instruction queue activity: 00 no queue operation, 01 first opcode byte, 10 queue empty, 11 subsequent byte.',
+      modeNote:'This physical pin changes function completely when MN/MX# selects the processor operating mode.', related:[18,25,33]
+    });
+    addPin({
+      n:25, name:'ALE / QS0', minName:'ALE', maxName:'QS0', alt:'Address latch enable / Queue status 0', category:'Mode Multiplexed', direction:'Output', mode:'Min / Max',
+      minSummary:'Pulse used to latch the multiplexed address bus.', maxSummary:'Instruction queue status bit QS0.',
+      minDetails:'ALE is asserted during T1 so external latches can capture AD0–AD15 and the multiplexed upper address/status lines before those pins change role.',
+      maxDetails:'QS0 combines with QS1 on pin 24 to describe the instruction queue state, useful to coprocessor or bus-monitor logic.',
+      modeNote:'In minimum mode this is the key timing signal for demultiplexing the address bus.', related:[2,16,24,33]
+    });
+    addPin({
+      n:26, name:'DEN# / S0', minName:'DEN#', maxName:'S0', alt:'Data enable / Bus status 0', category:'Mode Multiplexed', direction:'Output', mode:'Min / Max',
+      minSummary:'Enables external bidirectional data transceivers.', maxSummary:'Bus-cycle status output S0.',
+      minDetails:'DEN# is active low and enables the external data-bus transceiver during data transfer portions of a bus cycle.',
+      maxDetails:'In maximum mode S0, S1 and S2 encode the current bus-cycle type for an 8288 bus controller, which generates memory and I/O command strobes.',
+      modeNote:'Maximum-mode status signals move command decoding to external bus-control hardware.', related:[27,28,33]
+    });
+    addPin({
+      n:27, name:'DT/R# / S1', minName:'DT/R#', maxName:'S1', alt:'Data transmit/receive / Bus status 1', category:'Mode Multiplexed', direction:'Output', mode:'Min / Max',
+      minSummary:'Sets the direction of external data-bus transceivers.', maxSummary:'Bus-cycle status output S1.',
+      minDetails:'DT/R# indicates whether the processor is transmitting data onto the bus or receiving data from it. It works with DEN# when discrete bus transceivers are used.',
+      maxDetails:'S1 is one of the three maximum-mode bus status lines decoded by the 8288 bus controller.',
+      modeNote:'The exact active level at the transceiver depends on how the external buffer is wired; use the datasheet timing when designing hardware.', related:[26,28,33]
+    });
+    addPin({
+      n:28, name:'M/IO# / S2', minName:'M/IO#', maxName:'S2', alt:'Memory/I/O select / Bus status 2', category:'Mode Multiplexed', direction:'Output', mode:'Min / Max',
+      minSummary:'Distinguishes memory bus cycles from I/O bus cycles.', maxSummary:'Bus-cycle status output S2.',
+      minDetails:'In minimum mode M/IO# identifies the address space involved in the current cycle so external logic can generate the correct memory or I/O controls.',
+      maxDetails:'S2 joins S1 and S0 as the maximum-mode bus-cycle code consumed by the 8288 bus controller.',
+      modeNote:'In maximum mode, the 8086 exports status rather than directly providing all memory/I/O command signals.', related:[26,27,29,33]
+    });
+    addPin({
+      n:29, name:'WR# / LOCK#', minName:'WR#', maxName:'LOCK#', alt:'Write strobe / Bus lock', category:'Mode Multiplexed', direction:'Output', mode:'Min / Max',
+      minSummary:'Active-low write command for memory or I/O devices.', maxSummary:'Active-low bus lock indication.',
+      minDetails:'WR# goes low during processor write cycles. External memory or I/O logic combines it with other bus-control signals to accept data.',
+      maxDetails:'LOCK# prevents other bus masters from taking control of the system bus during a locked instruction sequence, preserving atomic access.',
+      modeNote:'LOCK# is especially important in multiprocessor or bus-mastering systems.', related:[28,30,31,33]
+    });
+    addPin({
+      n:30, name:'HLDA / RQ/GT1#', minName:'HLDA', maxName:'RQ/GT1#', alt:'Hold acknowledge / Request-grant 1', category:'Bus Arbitration', direction:'Output / Bidirectional', mode:'Min / Max',
+      minSummary:'Acknowledges that the processor has released the local bus.', maxSummary:'Bidirectional request/grant handshake channel 1.',
+      minDetails:'After accepting HOLD in minimum mode, the CPU asserts HLDA to show that another bus master may use the buses.',
+      maxDetails:'RQ/GT1# is a bidirectional maximum-mode bus arbitration line. Channel 1 has lower priority than RQ/GT0#.',
+      modeNote:'Minimum mode uses separate HOLD/HLDA pins; maximum mode uses request/grant handshakes.', related:[31,29,33]
+    });
+    addPin({
+      n:31, name:'HOLD / RQ/GT0#', minName:'HOLD', maxName:'RQ/GT0#', alt:'Hold request / Request-grant 0', category:'Bus Arbitration', direction:'Input / Bidirectional', mode:'Min / Max',
+      minSummary:'External request for control of the processor bus.', maxSummary:'Higher-priority bidirectional request/grant channel 0.',
+      minDetails:'When HOLD is accepted, the 8086 finishes the appropriate current bus activity, releases the buses, and responds with HLDA on pin 30.',
+      maxDetails:'RQ/GT0# is the higher-priority of the two maximum-mode request/grant lines for other bus masters.',
+      modeNote:'Bus arbitration lets DMA controllers or other processors temporarily own the system bus.', related:[30,29,33]
+    });
+    addPin({ n:32, name:'RD#', alt:'Read strobe', category:'Bus Control', direction:'Output', summary:'Active-low read control output.', details:'RD# indicates that the processor is performing a read transfer. It is used by memory or I/O control logic to enable the addressed device onto the data bus.', related:[22,28,29] });
+    addPin({ n:33, name:'MN/MX#', alt:'Minimum / Maximum mode select', category:'Mode Select', direction:'Input', summary:'Selects the 8086 bus-control operating mode.', details:'Tie this input high for minimum mode, where the processor directly generates most bus controls. Tie it low for maximum mode, intended for systems using an external bus controller and more advanced arbitration.', modeNote:'The mode selection changes the functions of pins 24 through 31.', related:[24,25,26,27,28,29,30,31] });
+    addPin({ n:34, name:'BHE# / S7', alt:'Bus High Enable / Status 7', category:'Address / Status', direction:'Output', summary:'Selects the upper data byte during T1, then becomes status S7.', details:'BHE# is active low and enables the high data byte D8–D15. Together with A0 it determines whether a transfer uses the low byte, high byte, or both bytes of the 16-bit data bus. Later in the bus cycle this pin carries status S7.', related:[2,9,35] });
+    addPin({ n:35, name:'A19 / S6', alt:'Address 19 / Status 6', category:'Address / Status', direction:'Output', summary:'Upper address bit A19 during T1, status S6 afterward.', details:'The 8086 multiplexes the four highest address bits with status information. S6 is reserved and is normally low.', related:[34,36,37,38] });
+    addPin({ n:36, name:'A18 / S5', alt:'Address 18 / Status 5', category:'Address / Status', direction:'Output', summary:'Upper address bit A18 during T1, status S5 afterward.', details:'After T1, S5 reflects the current Interrupt Flag (IF), exposing whether maskable interrupts are enabled.', related:[35,37,38] });
+    addPin({ n:37, name:'A17 / S4', alt:'Address 17 / Status 4', category:'Address / Status', direction:'Output', summary:'Upper address bit A17 during T1, status S4 afterward.', details:'S4 combines with S3 to identify which segment register was used for the current memory reference.', related:[35,36,38] });
+    addPin({ n:38, name:'A16 / S3', alt:'Address 16 / Status 3', category:'Address / Status', direction:'Output', summary:'Upper address bit A16 during T1, status S3 afterward.', details:'S3 combines with S4 to encode the segment register associated with the current memory access, such as ES, SS, CS, or DS.', related:[35,36,37] });
+    addPin({ n:39, name:'AD15', alt:'Address/Data bit 15', category:'Address / Data', direction:'Bidirectional', summary:'Highest multiplexed address/data line.', details:'During T1 this pin carries A15; afterward it carries D15 for data transfers. Like the other AD lines it is tri-stated when the processor relinquishes the bus.', related:[2,16,25,34] });
+    addPin({ n:40, name:'VCC', alt:'+5 V supply', category:'Power', direction:'Supply', summary:'Positive supply input for the 8086.', details:'The classic 8086 uses a +5 V supply. Good decoupling close to the package is important in real hardware to reduce supply noise caused by switching currents.', related:[1,20] });
+
+    pins.sort((a,b)=>a.n-b.n);
+
+    // ------------------------------
+    // DOM references / state
+    // ------------------------------
+    const $ = (s) => document.querySelector(s);
+    const pinList = $('#pinList');
+    const pinSearch = $('#pinSearch');
+    const resultCount = $('#resultCount');
+    let currentMode = 'min';
+    let selectedPin = 1;
+
+    const categoryClass = {
+      'Power':'border-amber-300/20 bg-amber-300/10 text-amber-200',
+      'Address / Data':'border-cyan-300/20 bg-cyan-300/10 text-cyan-200',
+      'Interrupt':'border-rose-300/20 bg-rose-300/10 text-rose-200',
+      'Timing':'border-blue-300/20 bg-blue-300/10 text-blue-200',
+      'Control':'border-slate-300/15 bg-slate-300/10 text-slate-300',
+      'Mode Multiplexed':'border-violet-300/20 bg-violet-300/10 text-violet-200',
+      'Bus Arbitration':'border-fuchsia-300/20 bg-fuchsia-300/10 text-fuchsia-200',
+      'Bus Control':'border-indigo-300/20 bg-indigo-300/10 text-indigo-200',
+      'Mode Select':'border-emerald-300/20 bg-emerald-300/10 text-emerald-200',
+      'Address / Status':'border-sky-300/20 bg-sky-300/10 text-sky-200',
+    };
+
+    const getModeName = (pin) => currentMode === 'min' ? (pin.minName || pin.name) : (pin.maxName || pin.name);
+    const getModeSummary = (pin) => currentMode === 'min' ? (pin.minSummary || pin.summary) : (pin.maxSummary || pin.summary);
+    const getModeDetails = (pin) => currentMode === 'min' ? (pin.minDetails || pin.details) : (pin.maxDetails || pin.details);
+
+    function renderPinList(filter='') {
+      const q = filter.trim().toLowerCase();
+      const filtered = pins.filter(pin => {
+        const hay = `${pin.n} ${pin.name} ${pin.minName || ''} ${pin.maxName || ''} ${pin.alt} ${pin.category} ${pin.summary} ${pin.details}`.toLowerCase();
+        return !q || hay.includes(q);
+      });
+      resultCount.textContent = filtered.length;
+      pinList.innerHTML = filtered.map(pin => {
+        const modeName = getModeName(pin);
+        return `<button data-pin="${pin.n}" class="pin-row ${pin.n===selectedPin?'active':''} flex w-full items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-left hover:border-white/10 hover:bg-white/[.035]">
+          <span class="mono-num flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[.045] text-xs font-bold text-slate-500">${pin.n}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-semibold ${pin.n===selectedPin?'text-cyan-100':'text-slate-300'}">${modeName}</span>
+            <span class="mt-0.5 block truncate text-[11px] text-slate-600">${pin.category}</span>
+          </span>
+        </button>`;
+      }).join('');
+
+      pinList.querySelectorAll('[data-pin]').forEach(btn => btn.addEventListener('click', () => selectPin(Number(btn.dataset.pin), true)));
+    }
+
+    function updateDetails(pin) {
+      $('#pinNumber').textContent = pin.n;
+      $('#pinName').textContent = getModeName(pin);
+      $('#pinAlt').textContent = pin.alt;
+      $('#pinDirection').textContent = pin.direction;
+      $('#pinMode').textContent = pin.mode;
+      $('#pinSummary').textContent = getModeSummary(pin);
+      $('#pinDetails').textContent = getModeDetails(pin);
+      $('#pinCategory').textContent = pin.category;
+      $('#pinCategory').className = `rounded-full border px-2.5 py-1 text-[11px] font-semibold ${categoryClass[pin.category] || categoryClass.Control}`;
+
+      const note = pin.modeNote || (pin.mode === 'Min / Max' ? 'This signal changes role with the selected processor mode.' : 'This pin keeps the same function in minimum and maximum mode.');
+      $('#modeNote').textContent = note;
+      $('#modeNoteWrap').classList.toggle('hidden', !note);
+
+      $('#relatedPins').innerHTML = (pin.related || []).map(n => {
+        const p = pins.find(x => x.n === n);
+        return `<button data-related="${n}" class="rounded-lg border border-white/10 bg-white/[.035] px-2.5 py-1.5 text-xs font-semibold text-slate-400 transition hover:border-cyan-300/25 hover:text-cyan-200">${n} · ${p ? getModeName(p) : ''}</button>`;
+      }).join('') || '<span class="text-xs text-slate-600">No direct related pins listed.</span>';
+      $('#relatedPins').querySelectorAll('[data-related]').forEach(btn => btn.addEventListener('click', () => selectPin(Number(btn.dataset.related), true)));
+    }
+
+    function selectPin(n, focusModel=false) {
+      selectedPin = n;
+      const pin = pins.find(p => p.n === n);
+      if (!pin) return;
+      updateDetails(pin);
+      renderPinList(pinSearch.value);
+      highlight3DPin(n, focusModel);
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      const min = mode === 'min';
+      $('#modeMin').className = min
+        ? 'rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-3.5 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/15'
+        : 'rounded-xl border border-white/10 bg-white/[.035] px-3.5 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.07]';
+      $('#modeMax').className = !min
+        ? 'rounded-xl border border-violet-300/30 bg-violet-300/10 px-3.5 py-2 text-sm font-semibold text-violet-100 transition hover:bg-violet-300/15'
+        : 'rounded-xl border border-white/10 bg-white/[.035] px-3.5 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.07]';
+      $('#sceneMode').textContent = min ? 'MINIMUM' : 'MAXIMUM';
+      $('#sceneMode').className = `ml-2 font-bold ${min ? 'text-cyan-200' : 'text-violet-200'}`;
+      renderPinList(pinSearch.value);
+      updateDetails(pins.find(p=>p.n===selectedPin));
+      updateBoardLabel();
+    }
+
+    pinSearch.addEventListener('input', e => renderPinList(e.target.value));
+    document.addEventListener('keydown', e => {
+      if (e.key === '/' && document.activeElement !== pinSearch) { e.preventDefault(); pinSearch.focus(); }
+      if (e.key === 'Escape' && !$('#referenceModal').classList.contains('hidden')) closeReference();
+    });
+    $('#modeMin').addEventListener('click', () => setMode('min'));
+    $('#modeMax').addEventListener('click', () => setMode('max'));
+    $('#nextPin').addEventListener('click', () => selectPin(selectedPin === 40 ? 1 : selectedPin + 1, true));
+
+    const referenceModal = $('#referenceModal');
+    const openReference = () => { referenceModal.classList.remove('hidden'); referenceModal.classList.add('flex'); };
+    const closeReference = () => { referenceModal.classList.add('hidden'); referenceModal.classList.remove('flex'); };
+    $('#referenceBtn').addEventListener('click', openReference);
+    $('#closeReference').addEventListener('click', closeReference);
+    referenceModal.addEventListener('click', e => { if (e.target === referenceModal) closeReference(); });
+
+    // ------------------------------
+    // Three.js scene
+    // ------------------------------
+    const canvas = $('#scene');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x071018, 0.028);
+
+    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+    camera.position.set(10.5, 10.5, 14.5);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 8;
+    controls.maxDistance = 31;
+    controls.target.set(0, 0, 0);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.65;
+
+    scene.add(new THREE.HemisphereLight(0xbfeeff, 0x101018, 2.25));
+    const key = new THREE.DirectionalLight(0xffffff, 5.1);
+    key.position.set(8, 13, 5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048,2048);
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 40;
+    scene.add(key);
+    const rim = new THREE.PointLight(0x22d3ee, 70, 18, 2);
+    rim.position.set(-7, 4, -6);
+    scene.add(rim);
+    const rim2 = new THREE.PointLight(0x8b5cf6, 50, 18, 2);
+    rim2.position.set(7, 2, 5);
+    scene.add(rim2);
+
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(12, 96),
+      new THREE.MeshStandardMaterial({ color:0x081018, roughness:0.92, metalness:0.05, transparent:true, opacity:0.78 })
+    );
+    floor.rotation.x = -Math.PI/2;
+    floor.position.y = -1.1;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // subtle floor rings
+    [4.7, 7, 9.2].forEach((r, i) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(r, r+0.018, 96),
+        new THREE.MeshBasicMaterial({ color: i===0 ? 0x22d3ee : 0x334155, transparent:true, opacity:i===0?.17:.08, side:THREE.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI/2;
+      ring.position.y = -1.09;
+      scene.add(ring);
+    });
+
+    const chipGroup = new THREE.Group();
+    chipGroup.rotation.y = -0.08;
+    scene.add(chipGroup);
+
+    const bodyMat = new THREE.MeshPhysicalMaterial({ color:0x101317, roughness:0.48, metalness:0.18, clearcoat:0.28, clearcoatRoughness:0.34 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(5.3, 0.92, 10.8, 2, 1, 2), bodyMat);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    body.position.y = 0.02;
+    chipGroup.add(body);
+
+    // beveled-ish top plate
+    const topPlate = new THREE.Mesh(
+      new THREE.BoxGeometry(4.86, 0.06, 10.28),
+      new THREE.MeshStandardMaterial({ color:0x171b20, roughness:0.62, metalness:0.12 })
+    );
+    topPlate.position.y = 0.515;
+    chipGroup.add(topPlate);
+
+    // notch
+    const notch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.58,0.58,0.12,48),
+      new THREE.MeshStandardMaterial({ color:0x07090b, roughness:0.8 })
+    );
+    notch.position.set(0,0.57,-5.12);
+    chipGroup.add(notch);
+
+    // center mark / label with canvas texture
+    function makeTextSprite(text, {font='700 54px Arial', fg='#e2e8f0', bg='rgba(0,0,0,0)', pad=18, scale=1}={}) {
+      const c = document.createElement('canvas');
+      const ctx = c.getContext('2d');
+      ctx.font = font;
+      const w = Math.ceil(ctx.measureText(text).width + pad*2);
+      const h = 88;
+      c.width = w; c.height = h;
+      ctx.font = font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = bg;
+      ctx.fillRect(0,0,w,h);
+      ctx.fillStyle = fg;
+      ctx.fillText(text,w/2,h/2+1);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false });
+      const sprite = new THREE.Sprite(mat);
+      const aspect = w/h;
+      sprite.scale.set(aspect*scale, scale, 1);
+      return sprite;
+    }
+
+    const mainLabel = makeTextSprite('8086', {font:'800 58px Arial', fg:'#dce7ee', scale:1.22});
+    mainLabel.position.set(0,0.59,0.05);
+    mainLabel.material.rotation = 0;
+    chipGroup.add(mainLabel);
+
+    let boardLabel = makeTextSprite('MIN MODE', {font:'700 34px Arial', fg:'#67e8f9', scale:.65});
+    boardLabel.position.set(0,0.59,1.02);
+    chipGroup.add(boardLabel);
+
+    function updateBoardLabel() {
+      chipGroup.remove(boardLabel);
+      boardLabel.material.map.dispose();
+      boardLabel.material.dispose();
+      boardLabel = makeTextSprite(currentMode === 'min' ? 'MIN MODE' : 'MAX MODE', {font:'700 34px Arial', fg:currentMode === 'min' ? '#67e8f9' : '#c4b5fd', scale:.65});
+      boardLabel.position.set(0,0.59,1.02);
+      chipGroup.add(boardLabel);
+    }
+
+    const pinMaterialBase = new THREE.MeshStandardMaterial({ color:0xd4c48d, metalness:0.86, roughness:0.28 });
+    const pinMeshes = [];
+    const numberSprites = [];
+    const categoryColor = {
+      'Power':0xf59e0b,
+      'Address / Data':0x22d3ee,
+      'Interrupt':0xfb7185,
+      'Timing':0x60a5fa,
+      'Control':0x94a3b8,
+      'Mode Multiplexed':0xa78bfa,
+      'Bus Arbitration':0xe879f9,
+      'Bus Control':0x818cf8,
+      'Mode Select':0x34d399,
+      'Address / Status':0x38bdf8
+    };
+
+    function pinPosition(n) {
+      if (n <= 20) return { side:-1, z:-4.82 + (n-1)*(9.64/19) };
+      return { side:1, z:-4.82 + (40-n)*(9.64/19) };
+    }
+
+    pins.forEach(pin => {
+      const {side,z} = pinPosition(pin.n);
+      const mat = pinMaterialBase.clone();
+      mat.emissive = new THREE.Color(0x000000);
+      mat.emissiveIntensity = 0;
+
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.17, 0.29), mat);
+      arm.position.set(side*3.30, -0.08, z);
+      arm.castShadow = true;
+      arm.userData.pinNumber = pin.n;
+      chipGroup.add(arm);
+
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.66, 0.29), mat);
+      leg.position.set(side*4.03, -0.39, z);
+      leg.castShadow = true;
+      leg.userData.pinNumber = pin.n;
+      chipGroup.add(leg);
+
+      // tiny colored marker gives category information without recoloring the metal lead
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.09, 16, 16),
+        new THREE.MeshBasicMaterial({ color:categoryColor[pin.category] || 0x94a3b8, transparent:true, opacity:0.82 })
+      );
+      marker.position.set(side*4.28, -0.06, z);
+      marker.userData.pinNumber = pin.n;
+      chipGroup.add(marker);
+
+      pinMeshes.push(arm, leg, marker);
+
+      const label = makeTextSprite(String(pin.n), {font:'700 48px Arial', fg:'#94a3b8', scale:.43});
+      label.position.set(side*4.72, 0.1, z);
+      label.userData.pinNumber = pin.n;
+      numberSprites.push(label);
+      chipGroup.add(label);
+    });
+
+    // Selected-pin glow and pulse
+    const selector = new THREE.Mesh(
+      new THREE.TorusGeometry(0.24,0.035,12,36),
+      new THREE.MeshBasicMaterial({ color:0x67e8f9, transparent:true, opacity:.95 })
+    );
+    selector.rotation.x = Math.PI/2;
+    chipGroup.add(selector);
+
+    const pulse = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 18, 18),
+      new THREE.MeshBasicMaterial({ color:0x67e8f9 })
+    );
+    chipGroup.add(pulse);
+    let pulseT = 0;
+
+    function highlight3DPin(n, focusModel=false) {
+      pinMeshes.forEach(mesh => {
+        const is = mesh.userData.pinNumber === n;
+        if (mesh.material && 'emissive' in mesh.material) {
+          mesh.material.emissive.setHex(is ? 0x22d3ee : 0x000000);
+          mesh.material.emissiveIntensity = is ? 0.85 : 0;
+        }
+        if (mesh.geometry.type === 'SphereGeometry') {
+          mesh.scale.setScalar(is ? 1.7 : 1);
+        }
+      });
+      const {side,z} = pinPosition(n);
+      selector.position.set(side*4.28, -0.06, z);
+      pulseT = 0;
+      if (focusModel) {
+        const target = new THREE.Vector3(side*1.0, 0, z*0.32);
+        controls.target.lerp(target, .7);
+      }
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2(99,99);
+    let hoverPin = null;
+
+    function setPointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left)/rect.width)*2 - 1;
+      pointer.y = -((e.clientY - rect.top)/rect.height)*2 + 1;
+    }
+
+    canvas.addEventListener('pointermove', e => {
+      setPointer(e);
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(pinMeshes, false)[0];
+      const n = hit?.object?.userData?.pinNumber ?? null;
+      if (n !== hoverPin) {
+        hoverPin = n;
+        canvas.style.cursor = n ? 'pointer' : 'grab';
+      }
+    });
+    canvas.addEventListener('pointerleave', () => { hoverPin = null; canvas.style.cursor = 'grab'; });
+    canvas.addEventListener('click', e => {
+      setPointer(e);
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(pinMeshes, false)[0];
+      const n = hit?.object?.userData?.pinNumber;
+      if (n) selectPin(n, false);
+    });
+
+    let autoRotate = true;
+    $('#toggleRotate').addEventListener('click', () => {
+      autoRotate = !autoRotate;
+      controls.autoRotate = autoRotate;
+      $('#toggleRotate').textContent = `Auto rotate: ${autoRotate ? 'On' : 'Off'}`;
+    });
+    let labelsOn = true;
+    $('#toggleLabels').addEventListener('click', () => {
+      labelsOn = !labelsOn;
+      numberSprites.forEach(s => s.visible = labelsOn);
+      $('#toggleLabels').textContent = `Pin numbers: ${labelsOn ? 'On' : 'Off'}`;
+    });
+
+    const defaultCamera = { pos:new THREE.Vector3(10.5,10.5,14.5), target:new THREE.Vector3(0,0,0) };
+    $('#resetCamera').addEventListener('click', () => {
+      camera.position.copy(defaultCamera.pos);
+      controls.target.copy(defaultCamera.target);
+      controls.update();
+    });
+
+    function resize() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      renderer.setSize(rect.width, rect.height, false);
+      camera.aspect = rect.width / rect.height;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), .05);
+      controls.update();
+
+      // Pulse a small signal bead between the chip body and selected lead.
+      const {side,z} = pinPosition(selectedPin);
+      pulseT = (pulseT + dt*.8) % 1;
+      const x0 = side*2.7;
+      const x1 = side*4.25;
+      pulse.position.set(THREE.MathUtils.lerp(x0,x1,pulseT), 0.08 + Math.sin(pulseT*Math.PI)*0.08, z);
+      pulse.material.color.set(currentMode === 'min' ? 0x67e8f9 : 0xc4b5fd);
+      selector.material.color.set(currentMode === 'min' ? 0x67e8f9 : 0xc4b5fd);
+      selector.rotation.z += dt*.55;
+
+      renderer.render(scene,camera);
+    }
+    animate();
+
+    // Initial UI state
+    renderPinList();
+    selectPin(1, false);
+    setMode('min');
+  </script>
+</body>
+</html>

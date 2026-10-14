@@ -1,12 +1,72 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1422"><meta name="description" content="Learn the Intel 8086 microprocessor with guided lessons, interactive pin diagrams, 2D and 3D architecture simulators, quizzes and reference notes."><title>8086 Academy — Interactive Microprocessor Learning</title><link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/styles.css"></head>
-<body><div class="app">
-<aside id="sidebar" class="sidebar" aria-label="Main navigation"><a class="brand" href="#/overview"><div class="brand-icon">86</div><div class="brand-text">8086 Academy<span>MICROPROCESSOR LAB</span></div></a>
-<div class="nav-label">Workspace</div><nav class="nav-group"><a class="nav-item" data-nav="overview" href="#/overview"><span class="nav-ico">⌂</span> Overview</a><a class="nav-item" data-nav="learn" href="#/learn"><span class="nav-ico">▤</span> Learning path <span class="count">08</span></a><a class="nav-item" data-nav="pinout" href="#/pinout"><span class="nav-ico">▦</span> Pin reference <span class="count">40</span></a></nav>
-<div class="nav-label">Interactive Labs</div><nav class="nav-group"><a class="nav-item" data-nav="pin-3d" href="#/lab/pin-3d"><span class="nav-ico">⬡</span> 3D Pin Explorer</a><a class="nav-item" data-nav="arch-2d" href="#/lab/arch-2d"><span class="nav-ico">◫</span> Architecture Lab</a><a class="nav-item" data-nav="arch-3d" href="#/lab/arch-3d"><span class="nav-ico">⬡</span> 3D Architecture</a><a class="nav-item" data-nav="labs" href="#/labs"><span class="nav-ico">▦</span> All 6 visualizations <span class="count">→</span></a></nav>
-<div class="nav-label">Study & Test</div><nav class="nav-group"><a class="nav-item" data-nav="quiz" href="#/quiz"><span class="nav-ico">✓</span> Knowledge check</a><a class="nav-item" data-nav="glossary" href="#/glossary"><span class="nav-ico">≡</span> Glossary</a></nav>
-<div class="side-bottom"><div class="side-tip"><div class="eyebrow">YOUR STUDY SPACE</div><strong>Learn by doing.</strong><p>Lessons, simulations and checkpoints — progress stays in this browser.</p><div style="margin-top:12px" class="progress-track"><div class="progress-fill" id="sidebar-progress" style="width:0"></div></div><p id="sidebar-progress-text" style="margin-top:8px">0 of 8 lessons complete</p></div><div class="side-footer">8086 Academy · Static educational website</div></div></aside>
-<div class="overlay" id="overlay"></div>
-<div class="workspace"><header class="topbar"><div class="row" style="justify-content:flex-start;min-width:0"><button id="mobile-toggle" class="mobile-toggle" type="button" aria-label="Open navigation" aria-expanded="false">☰</button><div class="breadcrumbs"><span>8086 Academy</span><span>›</span><strong id="breadcrumb-current">Overview</strong></div></div><div class="top-actions"><div class="search-wrap"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input class="search" id="global-search" autocomplete="off" aria-label="Search lessons, pins, and terms" placeholder="Search anything..."><span class="search-kbd">/</span><div id="search-results" class="search-results" hidden></div></div><span class="top-pill">● &nbsp; No login required</span></div></header>
-<main id="content" class="content" tabindex="-1"></main></div></div>
-<script src="assets/app.js" defer></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080e17">
+  <meta name="description" content="Explore interactive 3D Intel 8086 processor architecture, pins, and instruction-flow models in one place.">
+  <title>8086 Visual Lab — Interactive 3D Processor Models</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <a class="brand" href="#/model/advanced-architecture" aria-label="8086 Visual Lab home">
+      <span class="brand-mark"><svg viewBox="0 0 34 34" aria-hidden="true"><rect x="8" y="8" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 3v5m7-5v5m7-5v5M11 26v5m7-5v5m7-5v5M3 11h5m-5 7h5m-5 7h5m18-14h5m-5 7h5m-5 7h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><text x="17" y="21" text-anchor="middle" font-size="10" font-weight="900" fill="currentColor">86</text></svg></span>
+      <span class="brand-name">8086 <strong>Visual Lab</strong><span class="brand-caption">INTERACTIVE 3D MODELS</span></span>
+    </a>
+    <nav class="top-links" aria-label="View options">
+      <button class="header-tab" id="viewer-tab" type="button" aria-pressed="true"><span class="icon" data-icon="box"></span> Viewer</button>
+      <button class="header-tab" id="gallery-tab" type="button" aria-pressed="false"><span class="icon" data-icon="grid"></span> Model gallery</button>
+    </nav>
+    <div class="header-right">
+      <span class="library-count"><span class="count-light"></span><b>6</b> Interactive models</span>
+      <button id="mobile-models" class="icon-button menu-button" type="button" aria-label="Choose model" aria-expanded="false"><span class="icon" data-icon="menu"></span></button>
+    </div>
+  </header>
+
+  <div class="studio-layout">
+    <aside id="model-sidebar" class="model-sidebar" aria-label="Model library">
+      <div class="sidebar-head"><span class="eyebrow">MODEL COLLECTION</span><strong>Explore the hardware</strong><p>Choose any visualization to start interacting.</p></div>
+      <div class="nav-scroll" id="model-nav"></div>
+      <div class="sidebar-foot"><span class="online-dot"></span><span>Original interactive models<br><small>Preserved as standalone HTML</small></span></div>
+    </aside>
+    <div class="sidebar-shade" id="sidebar-shade"></div>
+
+    <main class="studio-main" id="main-content">
+      <section id="viewer-view" class="viewer-view" aria-label="Interactive model viewer">
+        <div class="viewer-heading">
+          <div class="viewer-heading-main"><p class="eyebrow" id="model-eyebrow">3D ARCHITECTURE <span class="crumb-sep">/</span> MODEL 01 OF 06</p><h1 id="model-heading">3D Architecture Studio</h1><p class="model-summary" id="model-summary">An interactive three-dimensional look inside the Intel 8086 processor.</p>
+            <div class="feature-tags" id="model-features"></div>
+          </div>
+          <div class="viewer-actions">
+            <button type="button" class="action-button" id="reference-button" title="Show original processor pin diagram"><span class="icon" data-icon="image"></span><span class="hide-mobile">Pin diagram</span></button>
+            <button type="button" class="action-button" id="copy-link" title="Copy a direct link to this model"><span class="icon" data-icon="link"></span><span class="hide-mobile">Share</span></button>
+            <a class="action-button" id="open-standalone" href="labs/advanced-3d-architecture.html" target="_blank" rel="noopener noreferrer" title="Open this model in a new tab"><span class="icon" data-icon="external"></span><span class="hide-mobile">New tab</span></a>
+            <button type="button" class="action-button action-primary" id="fullscreen-button" title="Expand model viewer"><span class="icon" data-icon="maximize"></span><span class="hide-mobile">Fullscreen</span></button>
+          </div>
+        </div>
+        <div id="stage" class="stage">
+          <div class="stage-toolbar"><div class="stage-status"><span class="pulse-dot"></span><span id="stage-label">LIVE INTERACTIVE VIEW</span><span class="stage-divider"></span><span id="stage-index">01 / 06</span></div><div class="stage-toolbar-right"><span class="stage-hint" id="stage-hint">Drag to rotate · Scroll to zoom · Click to inspect</span><button type="button" id="reload-model" class="stage-reload" title="Reload model"><span class="icon" data-icon="refresh"></span><span class="sr-only">Reload model</span></button></div></div>
+          <iframe id="model-frame" title="Interactive 8086 3D architecture model" src="labs/advanced-3d-architecture.html" allowfullscreen allow="fullscreen" loading="eager"></iframe>
+          <div class="stage-loading" id="stage-loading" aria-live="polite"><span class="loading-ring"></span><span>Loading interactive model…</span></div>
+        </div>
+        <div class="viewer-foot"><div class="foot-tip"><span class="icon" data-icon="mouse"></span><span id="usage-tip">Each model has its own controls. Try rotating and selecting a component to inspect its function.</span></div><div class="model-pagination"><button id="prev-model" type="button" title="Previous model"><span class="icon" data-icon="left"></span><span>Previous</span></button><button id="next-model" type="button" title="Next model"><span>Next model</span><span class="icon" data-icon="right"></span></button></div></div>
+      </section>
+
+      <section id="gallery-view" class="gallery-view" hidden aria-label="Visual model gallery">
+        <div class="gallery-hero"><div><p class="eyebrow">THE COLLECTION <span class="crumb-sep">/</span> SIX INTERACTIVE EXPERIENCES</p><h1>See the 8086 <em>from every angle.</em></h1><p>All the original interactive visualizations, brought together in one place. Choose a model and jump straight into the 3D experience.</p><button id="featured-start" class="big-button" type="button"><span class="icon" data-icon="box"></span> Launch featured model <span class="icon" data-icon="right"></span></button></div><div class="hero-chip" aria-hidden="true"><div class="chip-body"><div class="chip-groove"></div><span>INTEL</span><b>8086</b><small>16-BIT PROCESSOR</small></div></div></div>
+        <div class="gallery-section-head"><div><p class="eyebrow">EXPLORE THE MODELS</p><h2>Interactive collection <span>06</span></h2></div><div class="gallery-filters" id="gallery-filters" aria-label="Filter models"><button type="button" data-filter="all" class="filter-chip active">All models</button><button type="button" data-filter="architecture" class="filter-chip">Architecture</button><button type="button" data-filter="pinout" class="filter-chip">Pin explorers</button></div></div>
+        <div id="gallery-grid" class="gallery-grid"></div>
+        <div class="gallery-footer"><span>All models operate independently. No account or backend required.</span><span>Built for interactive exploration.</span></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="reference-modal" hidden><div class="reference-dialog" role="dialog" aria-modal="true" aria-labelledby="reference-title"><div class="reference-header"><div><p class="eyebrow">REFERENCE</p><h2 id="reference-title">Intel 8086 · 40-pin diagram</h2></div><button type="button" id="reference-close" class="icon-button" aria-label="Close pin diagram"><span class="icon" data-icon="close"></span></button></div><div class="reference-content"><img src="assets/8086-pin-diagram.jpg" alt="Intel 8086 40-pin dual in-line pin layout with minimum and maximum mode control signals"></div></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="assets/app.js" defer></script>
+</body>
+</html>

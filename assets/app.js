@@ -1,140 +1,187 @@
-/* 8086 Academy — dependency-free learning shell. Original labs stay isolated in their own HTML files. */
+/** 8086 Visual Lab — gallery and viewer only. Every original model remains sandboxed in its own HTML iframe. */
 'use strict';
-const $=s=>document.querySelector(s);
-const safeGet=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
-const safeSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-let done=new Set(safeGet('8086-academy-lessons',[]));
-let best=safeGet('8086-academy-best-quiz',0);
-const state={pin:1,mode:'min',quizIndex:0,quizAnswers:[],quizFinal:false,search:'',mobile:false};
-const LABS=[
-{id:'pin-3d',title:'3D Interactive Pin Explorer',kind:'3D · Pinout',icon:'⬡',tone:'',time:'Explore all 40 pins',file:'interactive-pin-explorer.html',desc:'Rotate the processor, search and select physical pins, inspect electrical roles and toggle minimum / maximum mode.',guide:'Start here for a close-up of the DIP-40 package. Use the left pin index and the reference-image button.'},
-{id:'arch-2d',title:'Interactive Architecture Lab',kind:'2D · Guided cycle',icon:'◫',tone:'purple',time:'Fetch → Decode → Execute',file:'architecture-lab.html',desc:'Explore the internal BIU and EU diagram, step through instruction execution, inspect registers and try an arithmetic mini-simulator.',guide:'For guided learning, choose Auto cycle or Step, then click each diagram component. The right panel explains what happens.'},
-{id:'arch-3d',title:'Advanced 3D Architecture',kind:'3D · Advanced',icon:'⬡',tone:'amber',time:'Data paths & telemetry',file:'advanced-3d-architecture.html',desc:'Examine a deep 3D block diagram, camera presets, live bus telemetry, register tools and animated pipeline flow.',guide:'This is the most detailed architecture experience. Use the pipeline controls, BIU / EU focus views and block inspector.'},
-{id:'pin-pro',title:'Microprocessor 3D Explorer',kind:'3D · Alternative pin lab',icon:'▣',tone:'',time:'Pinout & bus simulation',file:'processor-explorer.html',desc:'A full-featured alternate 3D pinout with signal filters, minimum/maximum modes, a T-state bus-cycle simulator and register reference.',guide:'Open the Bus Simulator to step through T1–T4 for read, write and interrupt-acknowledge examples.'},
-{id:'arch-classic',title:'Classic 3D Architecture',kind:'3D · Pipeline walkthrough',icon:'⌘',tone:'purple',time:'Seven instruction stages',file:'classic-3d-architecture.html',desc:'Orbit the BIU/EU and animate a worked ADD AX, BX example from instruction fetch to flags and register write-back.',guide:'Press Next to inspect each stage. Select blocks for detailed descriptions and use the 3D camera controls.'},
-{id:'pin-classic',title:'Classic 3D Pin Map',kind:'3D · Simple mode',icon:'▤',tone:'amber',time:'Fast 40-pin overview',file:'classic-pin-explorer.html',desc:'A lightweight 3D chip model with color-coded pin functions, filter chips and a simple mode switch.',guide:'A stripped-down visual reference for quick identification and comparing the pins in both modes.'}
+const MODELS = [
+  {
+    id: 'advanced-architecture', label: '3D Architecture Studio', small: 'Advanced spatial model', category: 'architecture', type: '3D ARCHITECTURE', file: 'labs/advanced-3d-architecture.html',
+    summary: 'Explore the complete internal architecture with an orbitable 3D diagram, interactive components, and live instruction-flow telemetry.',
+    features: ['3D orbit controls', 'Live data flow', 'Component inspector'], hint: 'Drag to orbit · Scroll to zoom · Select components', visual: 'arch',
+    notes: 'Full 3D visualization with camera presets, BIU and EU blocks, live bus telemetry, and clickable registers.'
+  },
+  {
+    id: 'processor-explorer', label: 'Instruction Flow Explorer', small: 'Animated 3D pathways', category: 'architecture', type: '3D ARCHITECTURE', file: 'labs/processor-explorer.html',
+    summary: 'Watch how bytes are fetched, queued, decoded, and executed using an explorable three-dimensional processor model.',
+    features: ['3D rotation', 'Step-through execution', 'Signal tracing'], hint: 'Rotate the model · Follow the instruction steps', visual: 'flow',
+    notes: 'Interactive walkthrough of instruction fetch, the six-byte queue, register operations, and the ALU.'
+  },
+  {
+    id: 'classic-architecture', label: '3D Block Diagram', small: 'BIU and EU layout', category: 'architecture', type: '3D ARCHITECTURE', file: 'labs/classic-3d-architecture.html',
+    summary: 'Inspect the 8086 bus interface and execution units as a spatial block diagram with clickable parts.',
+    features: ['3D view', 'Component filtering', 'Zoom & rotate'], hint: 'Drag to rotate · Click a block · Use the right panel', visual: 'blocks',
+    notes: 'Classic internal architecture model with detailed block descriptions and interactive controls.'
+  },
+  {
+    id: 'pin-explorer', label: '3D Pin Explorer', small: 'Interactive 40-pin package', category: 'pinout', type: '3D PIN EXPLORER', file: 'labs/interactive-pin-explorer.html',
+    summary: 'Orbit a detailed DIP-40 processor package and inspect every pin, signal direction, and min/max mode function.',
+    features: ['All 40 pins', 'Min / max mode', 'Pin search'], hint: 'Drag the chip to orbit · Select a pin · Toggle modes', visual: 'chip',
+    notes: 'Detailed interactive package model with comprehensive pin data, related pins, and mode switching.'
+  },
+  {
+    id: 'classic-pin', label: 'Classic DIP-40 Model', small: 'Color-coded pin explorer', category: 'pinout', type: '3D PIN EXPLORER', file: 'labs/classic-pin-explorer.html',
+    summary: 'A simplified, color-coded 3D Intel 8086 package with pin selection and signal-category filters.',
+    features: ['40 interactive pins', 'Signal filters', '3D rotation'], hint: 'Rotate · Click pins · Filter signal types', visual: 'classic-chip',
+    notes: 'Classic 3D pin visualization with top-view controls and minimum/maximum signal names.'
+  },
+  {
+    id: 'architecture-lab', label: 'Architecture Cycle Lab', small: 'Interactive 2D reference', category: 'architecture', type: '2D INTERACTIVE MODEL', file: 'labs/architecture-lab.html',
+    summary: 'Follow the processor data path on a detailed interactive 2D schematic with animated instruction steps.',
+    features: ['Interactive schematic', 'Animated cycles', 'Register playground'], hint: 'Click a block · Press Step or Auto cycle', visual: 'diagram',
+    notes: 'Additional two-dimensional model retained from the original files, ideal for understanding the underlying architecture.'
+  }
 ];
-const LESSONS=[
-{id:'intro',title:'Meet the Intel 8086',subtitle:'Understand what the processor is and why it matters',mins:6,level:'Beginner',body:`
-<h2>What is a microprocessor?</h2><p>A microprocessor is the central processing unit (CPU) implemented as an integrated circuit. It fetches instructions from memory, interprets them and executes operations such as arithmetic, logic, data movement and control flow.</p><p>Intel introduced the <strong>8086 in 1978</strong>. It helped establish the x86 family. Understanding its simple internal organization makes later processors much easier to study.</p>
-<h2>The numbers worth remembering</h2><div class="responsive-table"><table><thead><tr><th>Specification</th><th>Intel 8086</th><th>Why it matters</th></tr></thead><tbody><tr><td>Data width</td><td>16 bits</td><td>The ALU and general-purpose registers operate on 16-bit values.</td></tr><tr><td>Address width</td><td>20 bits</td><td>Can address 2²⁰ bytes = 1 MiB of physical memory.</td></tr><tr><td>External package</td><td>40-pin DIP</td><td>Address, data, control, clock, power and interrupt signals share 40 pins.</td></tr><tr><td>Instruction queue</td><td>6 bytes</td><td>The BIU fetches instructions in advance while the EU works.</td></tr><tr><td>Power</td><td>+5 V</td><td>Conventional supply for the original part.</td></tr></tbody></table></div>
-<h2>Its two main parts</h2><p>The processor is split into a <strong>Bus Interface Unit (BIU)</strong> and an <strong>Execution Unit (EU)</strong>. The BIU fetches instructions and exchanges data with memory and I/O devices. The EU decodes and executes instructions.</p><div class="example"><strong>First mental model</strong><p style="margin:8px 0 0">Think of the BIU as a delivery service that brings instruction bytes, and the EU as the workshop that interprets and carries them out. Because they can partly overlap their work, execution becomes more efficient.</p></div>
-<h2>Learning target</h2><p>By the end of this course, you should be able to locate the 40 pins, compare operating modes, identify internal registers, calculate physical addresses and explain a basic bus cycle.</p>`},
-{id:'pin-basics',title:'40 Pins & Signal Groups',subtitle:'Read the DIP pinout and recognize multiplexed lines',mins:9,level:'Beginner',body:`
-<h2>How pin numbering works</h2><p>Viewed from the top with the package notch facing up, <strong>pin 1 is at the top-left</strong>. Pin numbers go down the left side to 20, then up the right side from 21 at the bottom to 40 at the top.</p><p>Every pin has a number and a signal name. Some signal names include a bar or <code>#</code>, which means <strong>active low</strong>: the signal is asserted at logic 0.</p>
-<h2>Groups to learn first</h2><div class="responsive-table"><table><thead><tr><th>Signals</th><th>Purpose</th></tr></thead><tbody><tr><td>AD0–AD15</td><td>Time-multiplexed address/data bus; address during T1, data during later phases.</td></tr><tr><td>A16/S3–A19/S6</td><td>Upper address bits in T1 and processor status afterward.</td></tr><tr><td>BHE# / S7</td><td>High byte enable during address phase, status afterward.</td></tr><tr><td>RD#, WR#</td><td>Read and write commands (WR# appears on pin 29 in minimum mode).</td></tr><tr><td>CLK, READY, RESET, TEST</td><td>Clock, wait-state handshake, reset and WAIT synchronization.</td></tr><tr><td>NMI, INTR</td><td>Non-maskable and maskable hardware interrupts.</td></tr><tr><td>VCC, VSS</td><td>+5 V supply and ground.</td></tr></tbody></table></div>
-<h2>Why address/data pins are multiplexed</h2><p>A full 20-bit address bus plus a separate 16-bit data bus and all the control pins would require more pins. Instead, the lower 16 physical lines <strong>AD0–AD15</strong> first communicate address bits (T1) and later carry data. External address latches capture the address while ALE is asserted.</p><div class="example"><strong>Try it</strong><p style="margin:8px 0 10px">On the interactive pin diagram, choose pin 16 (AD0), pin 39 (AD15), pin 25 (ALE / QS0) and pin 33 (MN/MX#). Compare the different roles.</p><a class="btn sm" href="#/pinout?pin=16">Open interactive pin reference →</a></div>
-<h2>Byte selection</h2><p>The processor has a 16-bit data bus organized as low and high byte lanes. <strong>A0</strong> together with <strong>BHE#</strong> selects the appropriate lane(s). An unaligned 16-bit word can require two bus cycles.</p>`},
-{id:'modes',title:'Minimum vs Maximum Mode',subtitle:'Know when control signals change on pins 24–31',mins:8,level:'Core concept',body:`
-<h2>One chip, two operating modes</h2><p>Pin 33, <strong>MN/MX#</strong>, selects the control configuration of the 8086. Tying this input high selects minimum mode; tying it low selects maximum mode.</p>
-<div class="responsive-table"><table><thead><tr><th>Minimum mode (MN/MX# = 1)</th><th>Maximum mode (MN/MX# = 0)</th></tr></thead><tbody><tr><td>Designed for straightforward single-processor systems.</td><td>Designed for systems with more complex bus control / multiple bus masters.</td></tr><tr><td>The processor directly generates signals including ALE, DEN#, DT/R, WR#, HOLD and HLDA.</td><td>The 8086 exports status S2–S0, which an external 8288 bus controller decodes.</td></tr><tr><td>Separate HOLD and HLDA support bus requests.</td><td>RQ/GT0# and RQ/GT1# provide bidirectional request/grant handshakes.</td></tr></tbody></table></div>
-<h2>Pins that switch functions</h2><div class="responsive-table"><table><thead><tr><th>Pin</th><th>Minimum mode</th><th>Maximum mode</th></tr></thead><tbody><tr><td>24</td><td>INTA#</td><td>QS1</td></tr><tr><td>25</td><td>ALE</td><td>QS0</td></tr><tr><td>26</td><td>DEN#</td><td>S0</td></tr><tr><td>27</td><td>DT/R</td><td>S1</td></tr><tr><td>28</td><td>M/IO</td><td>S2</td></tr><tr><td>29</td><td>WR#</td><td>LOCK#</td></tr><tr><td>30</td><td>HLDA</td><td>RQ/GT1#</td></tr><tr><td>31</td><td>HOLD</td><td>RQ/GT0#</td></tr></tbody></table></div>
-<div class="notice"><strong>Common exam trap:</strong> The pins are physical connections, not two sets of pins. The functions on pins 24–31 are determined by the operating mode. Pin 32 RD# stays a read output in both modes.</div><p>Switch modes in the 3D Pin Explorer to see those labels update immediately.</p><a class="btn sm" href="#/lab/pin-3d">Switch between the modes →</a>`},
-{id:'architecture',title:'BIU, EU & Pipelining',subtitle:'See how the internal architecture overlaps work',mins:10,level:'Core concept',body:`
-<h2>The Bus Interface Unit (BIU)</h2><p>The BIU is the bridge between the processor and the external bus. It provides the <strong>segment registers (CS, DS, SS, ES)</strong>, the <strong>Instruction Pointer (IP)</strong>, address-generation hardware and a <strong>six-byte prefetch queue</strong>.</p><p>The BIU calculates addresses, fetches instruction bytes and performs external memory or I/O transfers requested by the EU.</p>
-<h2>The Execution Unit (EU)</h2><p>The EU contains the <strong>Arithmetic Logic Unit</strong>, instruction decoding/control, general-purpose registers <strong>AX, BX, CX, DX</strong>, pointer/index registers <strong>SP, BP, SI, DI</strong>, and the <strong>FLAGS</strong> register.</p><p>It takes instruction bytes from the BIU queue, decodes them and executes the required operation.</p>
-<h2>What pipelining means in the 8086</h2><ol><li>The BIU generates a physical address and begins an instruction fetch.</li><li>Fetched instruction bytes enter the six-byte queue.</li><li>The EU reads bytes from the queue to decode and execute an instruction.</li><li>When the bus is available and there is queue space, the BIU can fetch more instruction bytes in parallel.</li><li>Changing the instruction stream, such as via a taken branch, invalidates prefetched bytes and requires the queue to be refilled.</li></ol><div class="example"><strong>Follow a real worked example</strong><p style="margin:8px 0 12px">In the architecture walkthrough, try <code>ADD AX, BX</code>. Watch fetch → queue → decode → operand read → ALU → flags / write-back.</p><a class="btn sm" href="#/lab/arch-2d">Open Architecture Lab →</a></div>
-<h2>Important distinction</h2><p>This is a basic form of instruction prefetch overlap, <strong>not</strong> the deep multi-stage superscalar pipeline found in modern CPUs. Memory accesses performed by instructions may interrupt prefetching.</p>`},
-{id:'registers',title:'Registers & Flags',subtitle:'Learn what each of the 8086 registers actually does',mins:10,level:'Core concept',body:`
-<h2>General-purpose registers</h2><p>The four main 16-bit data registers can also be accessed as two independent 8-bit halves: <strong>AX = AH:AL</strong>, BX = BH:BL, CX = CH:CL, and DX = DH:DL.</p><div class="responsive-table"><table><thead><tr><th>Register</th><th>Typical role</th></tr></thead><tbody><tr><td>AX</td><td>Accumulator; arithmetic and certain I/O, multiplication and division operations.</td></tr><tr><td>BX</td><td>Base register, useful for memory addressing.</td></tr><tr><td>CX</td><td>Counter for loops and shift/rotate operations.</td></tr><tr><td>DX</td><td>Data register; supports extended arithmetic and variable I/O port addresses.</td></tr><tr><td>SP / BP</td><td>Stack Pointer / Base Pointer, usually in the stack segment.</td></tr><tr><td>SI / DI</td><td>Source and destination index, useful for string and indexed operations.</td></tr></tbody></table></div>
-<h2>Segment registers & IP</h2><p><strong>CS</strong> points to code, <strong>DS</strong> to data, <strong>SS</strong> to stack, and <strong>ES</strong> to an extra data segment. Combined with a 16-bit offset they identify memory locations. <strong>IP</strong> stores the offset of the next instruction within CS.</p>
-<h2>The FLAGS register</h2><p>The 8086 has nine commonly used status/control flags: <strong>CF, PF, AF, ZF, SF, TF, IF, DF and OF</strong>. Their meanings include carry, parity, auxiliary carry, zero, sign, trap, interrupt enable, direction and overflow.</p><div class="example"><strong>Example</strong><p style="margin:8px 0 0">If AX = 0005h and BX = 0003h, after <code>ADD AX, BX</code>, AX = 0008h. In this example the zero flag is 0 because the result is not zero, and the carry flag is also 0.</p></div>`},
-{id:'addressing',title:'Memory Address Calculation',subtitle:'Master segment:offset addressing with a live calculator',mins:11,level:'Practice',body:`
-<h2>How 16-bit registers reach 1 MiB</h2><p>The 8086 forms a 20-bit physical address by shifting a segment value left four bits (equivalent to multiplying by 16), then adding a 16-bit offset.</p><div class="example"><strong>Formula</strong><p style="font:700 18px/1.5 ui-monospace,Consolas,monospace;margin:10px 0;color:#dffbff">Physical Address = (Segment × 10h + Offset) mod 100000h</p><p style="margin:0">The result is 20-bit: in real mode, addresses wrap around the 1 MiB boundary.</p></div>
-<h2>Try your own segment and offset</h2><div id="calculator" class="card card-pad" style="margin:17px 0"><div class="row wrap" style="justify-content:flex-start"><label class="small">Segment (hex)<br><input id="segment" maxlength="4" value="2000" style="margin-top:5px;width:130px;background:#0a1726;border:1px solid #365269;border-radius:8px;color:white;padding:10px" aria-label="Segment in hexadecimal"></label><label class="small">Offset (hex)<br><input id="offset" maxlength="4" value="0100" style="margin-top:5px;width:130px;background:#0a1726;border:1px solid #365269;border-radius:8px;color:white;padding:10px" aria-label="Offset in hexadecimal"></label></div><div id="calc-output" style="margin-top:18px" aria-live="polite"></div></div>
-<h2>Worked examples</h2><div class="responsive-table"><table><thead><tr><th>Segment:Offset</th><th>Physical address</th></tr></thead><tbody><tr><td>2000:0100</td><td>20100h</td></tr><tr><td>1234:0010</td><td>12350h</td></tr><tr><td>FFFF:0000</td><td>FFFF0h (reset fetch address)</td></tr><tr><td>FFFF:0010</td><td>00000h (20-bit wraparound)</td></tr></tbody></table></div><div class="notice"><strong>Key idea:</strong> Different segment:offset pairs can refer to the same physical memory location. The address space is physical; segment values are logical starting points.</div>`},
-{id:'bus-cycles',title:'Bus Cycles & Timing',subtitle:'Understand T1–T4, ALE, READY and read/write strobes',mins:9,level:'Intermediate',body:`
-<h2>Four basic T-states</h2><p>A common minimum-mode memory bus cycle has four clock states: <strong>T1, T2, T3 and T4</strong>. If the selected memory or I/O device is too slow, READY can cause extra <strong>Tw wait states</strong> to be inserted.</p><div class="responsive-table"><table><thead><tr><th>State</th><th>What happens</th></tr></thead><tbody><tr><td>T1</td><td>The 8086 puts the address on multiplexed lines and asserts ALE so external latches capture it.</td></tr><tr><td>T2</td><td>Bus direction changes as appropriate; the processor starts read or write transfer control.</td></tr><tr><td>T3</td><td>Data transfer is established; READY determines whether wait states are required.</td></tr><tr><td>Tw (optional)</td><td>The processor waits for slow devices.</td></tr><tr><td>T4</td><td>The cycle finishes and control strobes return inactive.</td></tr></tbody></table></div>
-<h2>Read and write are different</h2><p>For a read, the processor provides an address and the selected external device drives data back. For a write, the processor sends data to the selected external device. The control signals depend on the processor mode: minimum-mode command outputs are direct, while maximum-mode status is decoded by the 8288.</p><div class="example"><strong>See the signals</strong><p style="margin:8px 0 12px">The alternate Microprocessor Explorer includes a bus-cycle simulator. Choose Memory Read, Memory Write or Interrupt Acknowledge and step through the timing states.</p><a class="btn sm" href="#/lab/pin-pro">Open bus-cycle simulator →</a></div>`},
-{id:'interrupts',title:'Interrupts & Final Review',subtitle:'Connect NMI, INTR, reset and the complete instruction flow',mins:8,level:'Intermediate',body:`
-<h2>What is an interrupt?</h2><p>An interrupt temporarily redirects execution to an interrupt service routine. The 8086 can receive interrupt requests through external inputs as well as instructions and internal conditions.</p><div class="responsive-table"><table><thead><tr><th>Input</th><th>Function</th></tr></thead><tbody><tr><td>INTR · pin 18</td><td>Maskable interrupt request; accepted when IF permits interrupts. An external interrupt type is supplied during acknowledgment.</td></tr><tr><td>NMI · pin 17</td><td>Non-maskable interrupt; edge-triggered, associated with interrupt type 2.</td></tr><tr><td>RESET · pin 21</td><td>Restarts fetching from physical address FFFF0h; this is not a standard maskable interrupt.</td></tr></tbody></table></div>
-<h2>Interrupt Vector Table</h2><p>The real-mode Interrupt Vector Table is located at physical addresses 00000h–003FFh. It has <strong>256 entries of 4 bytes</strong> each (offset and segment), allowing the CPU to locate service routines.</p>
-<h2>Put it all together</h2><ol><li>The BIU combines CS and IP to calculate the next fetch address.</li><li>The bus brings instruction bytes into the prefetch queue.</li><li>The EU decodes the bytes and executes the operation with registers and ALU.</li><li>FLAGS reflect relevant results; the next instruction or control transfer follows.</li><li>When an eligible interrupt occurs, control can be redirected to its vector's service routine.</li></ol><div class="example"><strong>Ready to test yourself?</strong><p style="margin:8px 0 12px">Revisit any interactive visualization, then take the knowledge check. Your best score is stored locally.</p><a class="btn sm" href="#/quiz">Take the 8086 quiz →</a></div>`}
-];
-const QUIZ=[
-{q:'What is the width of the original 8086 data bus?',a:['8 bits','16 bits','20 bits','32 bits'],correct:1,explain:'The Intel 8086 is a 16-bit microprocessor with a 16-bit external data bus.'},
-{q:'How much physical memory space can the 8086 address?',a:['64 KiB','256 KiB','1 MiB','4 GiB'],correct:2,explain:'A 20-bit address bus can identify 2²⁰ = 1,048,576 unique byte addresses.'},
-{q:'Which unit fetches instruction bytes into the six-byte queue?',a:['ALU','EU','BIU','FLAGS'],correct:2,explain:'The Bus Interface Unit performs prefetching and external memory/I/O transfers.'},
-{q:'Pin 33 (MN/MX#) must be connected to what for minimum mode?',a:['Logic 0 (GND)','Logic 1 (+5 V)','The CLK signal','Floating input'],correct:1,explain:'High selects minimum mode; low selects maximum mode.'},
-{q:'Which physical pin is ALE in minimum mode?',a:['24','25','29','32'],correct:1,explain:'Pin 25 is ALE in minimum mode, and QS0 in maximum mode.'},
-{q:'Which pair is used for the reset instruction fetch address?',a:['CS:IP = 0000:0000','CS:IP = FFFF:0000','DS:SI = 0000:0100','SS:SP = FFFF:FFFF'],correct:1,explain:'The 8086 reset vector is physical FFFF0h, corresponding to CS:IP = FFFF:0000.'},
-{q:'What physical address corresponds to 2000h:0100h?',a:['02100h','20010h','20100h','21000h'],correct:2,explain:'2000h × 10h = 20000h; add 0100h → 20100h.'},
-{q:'What does AD in AD0–AD15 mean?',a:['Analog data','Address/data multiplexed','Address decode only','Automatic DMA'],correct:1,explain:'The pins convey address bits during T1 and data in later phases.'},
-{q:'Which register is commonly used as a loop counter?',a:['CX','DX','SP','ES'],correct:0,explain:'CX is the count register used by LOOP and repeat instructions.'},
-{q:'Which signal allows slow devices to request wait states?',a:['NMI','READY','BHE#','TEST'],correct:1,explain:'When READY is not asserted, the processor can insert Tw wait states.'},
-{q:'Maximum mode commonly uses which external bus controller?',a:['8259','8255','8288','8087'],correct:2,explain:'The 8288 decodes the maximum-mode bus status signals into commands.'},
-{q:'What is the role of the FLAGS register?',a:['Holds physical pin numbers','Stores status and control bits','Buffers six prefetched bytes','Stores the external address only'],correct:1,explain:'FLAGS records conditions such as zero/carry and control state such as interrupt enable.'}
-];
-const GLOSSARY=[
-['8086','Intel 16-bit x86-family microprocessor introduced in 1978.'],['ALU','Arithmetic Logic Unit, the circuit performing math and bitwise logic.'],['BIU','Bus Interface Unit: address generation, prefetching and bus transfers.'],['EU','Execution Unit: decodes instructions, operates on data and updates flags.'],['Prefetch queue','Six-byte buffer holding instruction bytes fetched before the EU needs them.'],['Pipelining','Overlapping instruction fetching by the BIU with execution by the EU.'],['DIP-40','Dual in-line package with 40 pins, 20 on each side.'],['AD0–AD15','Multiplexed address/data lines used at different times in a bus cycle.'],['ALE','Address Latch Enable: captures the multiplexed address using an external latch.'],['BHE#','Bus High Enable, active low, selects the high data-byte lane.'],['RD#','Active-low read control strobe.'],['WR#','Active-low write strobe in minimum mode.'],['MN/MX#','Pin 33 input selecting minimum mode (high) or maximum mode (low).'],['8288','External bus controller used in 8086 maximum-mode systems.'],['HOLD / HLDA','Minimum-mode bus ownership request and acknowledgment handshake.'],['RQ/GT','Maximum-mode request/grant lines for bus arbitration.'],['T-state','A timing state within an external bus cycle: T1–T4 and optional Tw.'],['READY','Input controlling insertion of wait states for slow devices.'],['CS','Code Segment register used with IP for instruction address generation.'],['IP','Instruction Pointer: offset of the next instruction within CS.'],['SS / SP','Stack Segment / Stack Pointer used to address the stack.'],['DS / ES','Data Segment / Extra Segment registers.'],['AX / BX / CX / DX','16-bit general-purpose data registers, with separately accessible high/low bytes.'],['FLAGS','16-bit register holding status and control flags, including CF and ZF.'],['INTR','Maskable external interrupt-request input on pin 18.'],['NMI','Non-maskable external interrupt input on pin 17.'],['IVT','Interrupt Vector Table, 256 real-mode interrupt pointers at 00000h–003FFh.'],['Segment:Offset','Real-mode logical address pair used to form a 20-bit physical address.']
-];
-function pin(n,name,type,desc,dir='Output',min=null,max=null){return{n,name,type,desc,dir,min,max}}
-const PINS=[
-pin(1,'VSS (GND)','Power','Ground reference (0 V). Both ground pins 1 and 20 should be connected.','Supply')];
-for(let n=2;n<=16;n++){let i=16-n;PINS.push(pin(n,'AD'+i,'Address / Data',`Address bit A${i} during T1 and data bit D${i} during the data phase. External latches hold the address after ALE.`, 'Bidirectional'))}
-PINS.push(
-pin(17,'NMI','Interrupt','Non-maskable interrupt request. Rising-edge triggered; vector type 2.','Input'),
-pin(18,'INTR','Interrupt','Maskable interrupt request. Its recognition depends on the IF flag.','Input'),
-pin(19,'CLK','Timing','Processor timing clock, commonly supplied by an 8284 clock generator.','Input'),
-pin(20,'VSS (GND)','Power','Second ground reference, connected to 0 V.','Supply'),
-pin(21,'RESET','Control','Active-high processor reset; execution restarts at CS:IP FFFF:0000.','Input'),
-pin(22,'READY','Control','Controls wait-state insertion while communicating with slower memory or I/O.','Input'),
-pin(23,'TEST','Control','Input inspected by WAIT; commonly used for coprocessor coordination.','Input'),
-pin(24,'INTA# / QS1','Mode-dependent','Minimum: active-low interrupt acknowledge. Maximum: instruction queue status bit QS1.','Output','INTA#','QS1'),
-pin(25,'ALE / QS0','Mode-dependent','Minimum: Address Latch Enable. Maximum: instruction queue status bit QS0.','Output','ALE','QS0'),
-pin(26,'DEN# / S0','Mode-dependent','Minimum: data transceiver enable (active low). Maximum: bus status S0.','Output','DEN#','S0'),
-pin(27,'DT/R / S1','Mode-dependent','Minimum: controls direction of data transceivers. Maximum: bus status S1.','Output','DT/R','S1'),
-pin(28,'M/IO / S2','Mode-dependent','Minimum: memory vs I/O cycle identification. Maximum: bus status S2.','Output','M/IO','S2'),
-pin(29,'WR# / LOCK#','Mode-dependent','Minimum: active-low write strobe. Maximum: lock indication for bus arbitration.','Output','WR#','LOCK#'),
-pin(30,'HLDA / RQ/GT1#','Bus Arbitration','Minimum: HOLD acknowledgment. Maximum: lower-priority request/grant handshake.','Out / Bidirectional','HLDA','RQ/GT1#'),
-pin(31,'HOLD / RQ/GT0#','Bus Arbitration','Minimum: bus ownership request. Maximum: higher-priority request/grant handshake.','In / Bidirectional','HOLD','RQ/GT0#'),
-pin(32,'RD#','Control','Active-low read command on the processor bus.','Output'),
-pin(33,'MN/MX#','Mode select','High = minimum mode; low = maximum mode. Controls functions of pins 24–31.','Input'),
-pin(34,'BHE# / S7','Address / Status','High byte enable (active low) during T1, status bit S7 in later phases.','Output'),
-pin(35,'A19 / S6','Address / Status','Address bit A19 during T1, then status S6.','Output'),
-pin(36,'A18 / S5','Address / Status','Address bit A18 during T1; S5 reflects the interrupt enable flag afterward.','Output'),
-pin(37,'A17 / S4','Address / Status','Address bit A17 during T1; S4 helps identify which segment is in use.','Output'),
-pin(38,'A16 / S3','Address / Status','Address bit A16 during T1; S3 helps identify the active segment.','Output'),
-pin(39,'AD15','Address / Data','Address bit A15 during T1, data bit D15 in later bus phases.','Bidirectional'),
-pin(40,'VCC (+5V)','Power','Main positive power supply input: +5 V.','Supply'));
-const elContent=$('#content');
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function getRoute(){return (location.hash.slice(1)||'/overview').split('?')[0]}
-function setBread(x){$('#breadcrumb-current').textContent=x;document.title=`${x} · 8086 Academy`}
-function updateSide(){const n=done.size;$('#sidebar-progress').style.width=100*n/LESSONS.length+'%';$('#sidebar-progress-text').textContent=`${n} of ${LESSONS.length} lessons complete`;document.querySelectorAll('.nav-item').forEach(a=>{let r=getRoute();let k=r.startsWith('/learn/')?'learn':r.startsWith('/lab/')?r.split('/')[2]:r.slice(1);a.classList.toggle('active',a.dataset.nav===k)})}
-function header(eye,title,subtitle){return `<section class="page-top"><div class="eyebrow">${eye}</div><h1>${title}</h1><p class="title-desc">${subtitle}</p></section>`}
-function footer(){return `<footer class="footer-inline">Built for hands-on learning · No sign-in or tracking · Progress saved only on this device<br><span style="color:#416079">Some 3D labs use external JavaScript libraries and require an internet connection.</span></footer>`}
-function lessonItem(l,i){let yes=done.has(l.id);return `<a class="lesson-item" href="#/learn/${l.id}"><span class="lesson-num ${yes?'done':''}">${yes?'✓':String(i+1).padStart(2,'0')}</span><span><strong>${esc(l.title)}</strong><span class="lesson-meta" style="display:block">${esc(l.subtitle)}</span></span><span class="arr">↗</span></a>`}
-function labCard(l){return `<a class="lab-card ${l.tone}" href="#/lab/${l.id}"><span class="lab-icon" aria-hidden="true">${l.icon}</span><div><div class="eyebrow" style="font-size:10px;margin-bottom:7px">${l.kind}</div><strong style="display:block">${l.title}</strong><p>${l.desc}</p></div><div class="foot"><span>${l.time}</span><span>Explore ↗</span></div></a>`}
-function overview(){setBread('Overview');const next=LESSONS.find(l=>!done.has(l.id))||LESSONS[0];elContent.className='content';elContent.innerHTML=`
-<section class="hero"><div class="hero-copy"><div class="eyebrow">WELCOME TO THE 8086 ACADEMY</div><h1>Explore the processor.<br><span>Understand every bit.</span></h1><p>One place to learn Intel's 8086 — from physical pins to internal architecture, memory, timing and machine-level execution. Study, interact and test your knowledge.</p><div class="hero-actions"><a class="btn primary" href="#/learn/${next.id}">▶ &nbsp; ${done.size?'Continue learning':'Start learning'} <span>→</span></a><a class="btn" href="#/lab/pin-3d">⬡ &nbsp; Explore in 3D</a></div></div><div class="hero-visual" aria-hidden="true"><div class="chip"><div class="chip-center"><small>INTEL</small><strong>8086</strong><span>16-BIT MICROPROCESSOR</span><span class="chip-pin">1978 · DIP-40</span></div></div></div></section>
-<div class="stat-grid"><div class="stat-card"><span class="stat-icon">▦</span><div><strong>40</strong><span>Physical pins</span></div></div><div class="stat-card"><span class="stat-icon purple">⬡</span><div><strong>6</strong><span>Interactive labs</span></div></div><div class="stat-card"><span class="stat-icon amber">▤</span><div><strong>8</strong><span>Guided lessons</span></div></div><div class="stat-card"><span class="stat-icon green">✓</span><div><strong>${best?best+'/12':'12'}</strong><span>${best?'Best quiz result':'Quiz questions'}</span></div></div></div>
-<div class="section-heading"><div class="eyebrow">YOUR LEARNING JOURNEY</div><div class="row wrap"><h2>A clear path from beginner to confident</h2><a href="#/learn" class="btn sm ghost">Full learning path →</a></div><p>Each lesson connects the concepts to a real interactive visualization.</p></div>
-<div class="learning-grid"><section class="card card-pad"><div class="row wrap mb14"><h3 class="card-title">Guided lessons</h3><span class="small muted">${done.size} / 8 completed</span></div><div class="lesson-list">${LESSONS.slice(0,5).map(lessonItem).join('')}</div><a class="btn sm ghost" href="#/learn" style="margin-top:15px">View all lessons →</a></section><aside class="card path-card"><div class="eyebrow">YOUR PROGRESS</div><div class="big" style="margin:15px 0 7px">${Math.round(done.size/8*100)}%</div><p>Course completion</p><div class="progress-track" style="margin:13px 0 21px"><div class="progress-fill" style="width:${done.size/8*100}%"></div></div><h3 style="font-size:16px;margin-bottom:9px">Up next</h3><strong>${esc(next.title)}</strong><p style="margin:7px 0 20px">${esc(next.subtitle)}</p><a class="btn sm primary" href="#/learn/${next.id}">Open lesson →</a><div style="margin-top:26px;border-top:1px solid #2c4855;padding-top:18px"><div class="eyebrow" style="color:#a4bcce">TIP</div><p style="margin-top:7px">Prefer learning visually? You can jump into any of the labs at any time.</p></div></aside></div>
-<div class="section-heading"><div class="eyebrow">TRY IT YOURSELF</div><div class="row wrap"><h2>Interactive visualizations</h2><a href="#/labs" class="btn sm ghost">Explore all six →</a></div><p>Go beyond static diagrams — rotate, click, simulate and investigate.</p></div><div class="labs-grid">${LABS.slice(0,3).map(labCard).join('')}</div>${footer()}`}
-function learnList(){setBread('Learning path');elContent.className='content';elContent.innerHTML=`${header('LEARNING PATH','Intel 8086 · Guided course','Eight structured lessons, from the processor basics to addressing, bus timing and interrupts. Work through them in order, or open any topic you need.')}
-<div class="learning-grid"><div class="card card-pad"><div class="lesson-list">${LESSONS.map(lessonItem).join('')}</div></div><div class="card path-card"><div class="eyebrow">COURSE PROGRESS</div><div class="big" style="margin:15px 0 8px">${done.size} / 8</div><p>Completed lessons</p><div class="progress-track"><div class="progress-fill" style="width:${done.size/8*100}%"></div></div><div style="height:25px"></div><h3 class="card-title" style="margin-bottom:8px">Learning tips</h3><p>Read the explanation, open the linked visualization, then mark the lesson complete. There is no time limit.</p><a class="btn sm" href="#/quiz">Test what you know →</a></div></div>${footer()}`}
-function lessonPage(id){const i=LESSONS.findIndex(l=>l.id===id);if(i===-1)return notFound();const l=LESSONS[i];setBread(l.title);elContent.className='content';const prev=LESSONS[i-1],next=LESSONS[i+1];elContent.innerHTML=`${header(`LESSON ${String(i+1).padStart(2,'0')} OF 08 · ${esc(l.level.toUpperCase())}`,esc(l.title),esc(l.subtitle))}<div class="lesson-layout"><section class="card card-pad article"><div class="row wrap" style="padding-bottom:17px;border-bottom:1px solid var(--line);margin-bottom:22px"><span class="label">◷ &nbsp; ${l.mins} min read</span><span class="small muted">${done.has(l.id)?'✓ Completed':'Not completed yet'}</span></div>${l.body}<div class="lesson-footer"><span class="small muted">Finish the lesson when you're ready.</span><button class="btn ${done.has(l.id)?'':'primary'}" id="complete-lesson" type="button">${done.has(l.id)?'✓ Completed · Undo':'✓ Mark complete'}</button></div><div class="row wrap" style="margin-top:18px"><span>${prev?`<a class="btn sm" href="#/learn/${prev.id}">← Previous lesson</a>`:''}</span><span>${next?`<a class="btn sm primary" href="#/learn/${next.id}">Next lesson →</a>`:`<a class="btn sm primary" href="#/quiz">Take knowledge check →</a>`}</span></div></section><aside class="lesson-aside"><div class="card topic-outline"><div class="eyebrow">THIS COURSE</div><div style="margin:9px 0 10px" class="progress-track"><div class="progress-fill" style="width:${done.size/8*100}%"></div></div>${LESSONS.map((item,j)=>`<a href="#/learn/${item.id}" style="color:${item.id===id?'#9ae7f4':''}"><span style="display:inline-block;width:21px;color:${done.has(item.id)?'#6de2b2':'#647a8e'}">${done.has(item.id)?'✓':j+1+'.'}</span>${esc(item.title)}</a>`).join('')}</div><div class="card card-pad" style="margin-top:16px"><div class="eyebrow">HANDS-ON TOOLS</div><p class="small muted" style="margin-top:11px">Try these after the reading:</p><a class="btn sm" href="#/pinout" style="width:100%;margin-bottom:9px">▦ Interactive pinout</a><a class="btn sm" href="#/lab/arch-2d" style="width:100%">◫ Architecture lab</a></div></aside></div>${footer()}`;$('#complete-lesson').onclick=()=>{if(done.has(l.id))done.delete(l.id);else done.add(l.id);safeSet('8086-academy-lessons',[...done]);lessonPage(id);updateSide();toast(done.has(l.id)?'Lesson marked complete!':'Lesson marked incomplete')};if(id==='addressing'){const a=$('#segment'),b=$('#offset');a.addEventListener('input',calculate);b.addEventListener('input',calculate);calculate()}}
-function calculate(){const a=$('#segment')?.value.trim()||'',b=$('#offset')?.value.trim()||'',o=$('#calc-output');if(!o)return;if(!/^[0-9a-f]{1,4}$/i.test(a)||!/^[0-9a-f]{1,4}$/i.test(b)){o.innerHTML='<span style="color:#ffc77c">Please enter 1–4 hexadecimal digits in both fields.</span>';return}let x=parseInt(a,16),y=parseInt(b,16),raw=x*16+y,p=raw&0xfffff;const h=(v,n=5)=>v.toString(16).toUpperCase().padStart(n,'0')+'h';o.innerHTML=`<div class="row wrap small"><span>Segment shifted left:</span><strong class="mono">${h(x*16)}</strong></div><div class="row wrap small" style="margin-top:8px"><span>Offset:</span><strong class="mono">+ ${h(y)}</strong></div><div style="height:1px;background:#375365;margin:15px 0"></div><div class="row wrap"><strong>Physical address:</strong><strong style="font:800 24px ui-monospace,Consolas,monospace;color:#8ee8b9">${h(p)}</strong></div>${raw>0xfffff?'<div class="small" style="color:#ffd492;margin-top:10px">↻ The calculation wrapped at the 20-bit address boundary.</div>':''}`}
-function labsPage(){setBread('All interactive labs');elContent.className='content';elContent.innerHTML=`${header('INTERACTIVE LABORATORY','Explore all six visualizations','Your original HTML tools, collected in one place. Each runs on its own so its 3D rendering, buttons and simulations continue to work independently.')}<div class="labs-grid">${LABS.map(labCard).join('')}</div><div class="card card-pad" style="margin-top:24px"><strong>Why separate viewers?</strong><p style="margin:7px 0 0" class="muted small">The uploaded tools use different versions and patterns for their graphics libraries. Rather than merging all their scripts and causing conflicts, this site opens one self-contained visualization at a time. They are still part of the same website.</p></div>${footer()}`}
-function labPage(id){const l=LABS.find(x=>x.id===id);if(!l)return notFound();setBread(l.title);elContent.className='content lab-shell';elContent.innerHTML=`<div class="lab-head"><div><div class="eyebrow">INTERACTIVE LAB · ${l.kind.toUpperCase()}</div><h1>${esc(l.title)}</h1></div><div class="row gap8 wrap"><a href="#/labs" class="btn sm">← All labs</a><button id="reload-lab" class="btn sm" type="button">↻ Reset lab</button><button id="fullscreen-lab" class="btn sm primary" type="button">⛶ Full screen</button></div></div><div class="lab-notes">💡 <strong>Quick guide:</strong> ${esc(l.guide)}</div><iframe class="lab-frame" id="lab-frame" src="labs/${encodeURIComponent(l.file)}" title="${esc(l.title)}" loading="eager" allow="fullscreen" referrerpolicy="no-referrer"></iframe>`;$('#reload-lab').onclick=()=>{const f=$('#lab-frame');f.src=f.src};$('#fullscreen-lab').onclick=()=>{let f=$('#lab-frame');if(f.requestFullscreen)f.requestFullscreen()}}
-function pinName(p){return(state.mode==='min'&&p.min)||(state.mode==='max'&&p.max)||p.name}
-function pinout(){setBread('Interactive pin reference');elContent.className='content';const qs=new URLSearchParams(location.hash.split('?')[1]||'');const picked=Number(qs.get('pin'));if(picked>=1&&picked<=40)state.pin=picked;elContent.innerHTML=`${header('PINOUT REFERENCE','Explore all 40 physical pins','Select any pin to see its function. Switch between minimum and maximum mode to see how the shared control pins change.')}<div class="row wrap mb24"><div class="segmented" aria-label="8086 operating mode"><button id="select-min" class="${state.mode==='min'?'active':''}" type="button">Minimum mode</button><button id="select-max" class="${state.mode==='max'?'active':''}" type="button">Maximum mode</button></div><a class="btn sm" href="#/lab/pin-3d">Open 3D version ↗</a></div><div class="pin-layout"><section class="card card-pad"><div class="row"><div><div class="eyebrow">DIP-40 · TOP VIEW</div><div class="small muted" style="margin-top:7px">Notch at the top · Pin 1 upper-left</div></div><span class="label">40 PINS</span></div><div id="pin-diagram"></div><details style="border-top:1px solid var(--line);padding-top:15px"><summary style="cursor:pointer;color:#b9dbe9;font-size:12px;font-weight:750">Show the original uploaded pin diagram</summary><img loading="lazy" class="pin-reference-image" src="assets/8086-pin-diagram.jpg" alt="Original uploaded 8086 40-pin diagram showing minimum and maximum mode signal assignments"></details></section><aside class="card pin-details" id="pin-details"></aside></div>${footer()}`;$('#select-min').onclick=()=>{state.mode='min';pinout()};$('#select-max').onclick=()=>{state.mode='max';pinout()};renderPinDiagram();renderPinDetails()}
-function renderPinDiagram(){const d=$('#pin-diagram');if(!d)return;const row=(n,side)=>{const p=PINS[n-1],active=state.pin===n;return `<button class="pin-side ${side} ${active?'selected':''}" type="button" data-pin="${n}" aria-label="Select pin ${n}, ${esc(pinName(p))}" aria-pressed="${active}"><span class="pn">${n}</span><span class="signal">${esc(pinName(p))}</span><span class="lead"></span></button>`};d.innerHTML=`<div class="pin-chart"><div class="pin-rail">${Array.from({length:20},(_,i)=>row(i+1,'left')).join('')}</div><div class="pin-chip"><div class="pin-chip-center"><div class="small muted">INTEL</div><strong>8086</strong><span>16-BIT CPU</span><div class="eyebrow" style="margin-top:14px">${state.mode.toUpperCase()} MODE</div></div></div><div class="pin-rail">${Array.from({length:20},(_,i)=>row(40-i,'right')).join('')}</div></div>`;d.querySelectorAll('[data-pin]').forEach(x=>x.onclick=()=>{state.pin=Number(x.dataset.pin);renderPinDiagram();renderPinDetails()})}
-function renderPinDetails(){const p=PINS[state.pin-1],type=p.type;$('#pin-details').innerHTML=`<div class="eyebrow">PIN INSPECTOR</div><span class="label" style="margin-top:16px">PIN ${p.n} · ${esc(type)}</span><h2>${esc(pinName(p))}</h2><p class="muted small">Signal direction: ${esc(p.dir)}</p><div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--line)"><h3 style="font-size:16px;margin-bottom:11px">What does it do?</h3><p style="color:#b9ccde">${esc(p.desc)}</p></div>${p.min?`<div class="card card-pad" style="margin-top:18px;background:#152538"><div class="eyebrow">MODE-DEPENDENT SIGNAL</div><p style="margin:10px 0 6px">Minimum: <strong>${esc(p.min)}</strong></p><p style="margin:0">Maximum: <strong>${esc(p.max)}</strong></p></div>`:''}<div style="margin-top:24px;border-top:1px solid var(--line);padding-top:17px"><div class="row wrap"><span class="small muted">Explore neighboring pins</span><div class="row gap8"><button class="btn sm" type="button" id="pin-prev">←</button><button class="btn sm" type="button" id="pin-next">→</button></div></div></div><div class="card card-pad" style="background:#14273a;margin-top:22px"><div class="eyebrow">LEARN MORE</div><p class="small muted" style="margin-top:11px">In the 3D lab, inspect signal categories and rotate the physical processor.</p><a href="#/lab/pin-3d" class="btn sm" style="margin-top:2px">See pin in 3D ↗</a></div>`;$('#pin-prev').onclick=()=>{state.pin=state.pin===1?40:state.pin-1;renderPinDiagram();renderPinDetails()};$('#pin-next').onclick=()=>{state.pin=state.pin===40?1:state.pin+1;renderPinDiagram();renderPinDetails()}}
-function quizPage(){setBread('Knowledge check');elContent.className='content container-narrow';if(state.quizFinal)return quizResults();const q=QUIZ[state.quizIndex],i=state.quizIndex,answered=state.quizAnswers[i]!==undefined;elContent.innerHTML=`${header('KNOWLEDGE CHECK','Put your 8086 knowledge to the test','Twelve questions with explanations for every answer. No timer and no account required.')}<section class="card quiz-card"><div class="quiz-meta"><strong>Question ${i+1} of ${QUIZ.length}</strong><span>Best previous score: ${best} / ${QUIZ.length}</span></div><div class="quiz-head" style="margin-top:12px"><div style="width:${(i+1)/QUIZ.length*100}%"></div></div><div class="eyebrow">SELECT ONE ANSWER</div><h2>${esc(q.q)}</h2>${q.a.map((answer,j)=>`<button class="quiz-choice ${answered?(j===q.correct?'correct':state.quizAnswers[i]===j?'incorrect':''):''}" data-option="${j}" ${answered?'disabled':''} type="button"><span style="display:inline-block;width:30px;color:#88a4bb;font-weight:800">${'ABCD'[j]}.</span>${esc(answer)}${answered&&j===q.correct?' &nbsp; ✓':''}</button>`).join('')}${answered?`<div class="quiz-feedback ${state.quizAnswers[i]===q.correct?'':'bad'}"><strong>${state.quizAnswers[i]===q.correct?'✓ Correct!':'Not quite — here is why:'}</strong><p style="margin:7px 0 0">${esc(q.explain)}</p></div>`:''}<div class="row wrap" style="margin-top:24px"><button id="quiz-restart" class="btn sm">↻ Restart</button><div class="row gap8"><button id="quiz-prev" class="btn sm" ${i===0?'disabled':''}>← Previous</button><button id="quiz-next" class="btn primary" ${!answered?'disabled':''}>${i===QUIZ.length-1?'Finish quiz ✓':'Next question →'}</button></div></div></section>${footer()}`;elContent.querySelectorAll('[data-option]').forEach(b=>b.onclick=()=>{if(answered)return;state.quizAnswers[i]=Number(b.dataset.option);quizPage()});$('#quiz-restart').onclick=restartQuiz;$('#quiz-prev').onclick=()=>{state.quizIndex--;quizPage()};$('#quiz-next').onclick=()=>{if(i===QUIZ.length-1){state.quizFinal=true;const score=state.quizAnswers.filter((x,j)=>x===QUIZ[j].correct).length;if(score>best){best=score;safeSet('8086-academy-best-quiz',best)}quizPage()}else{state.quizIndex++;quizPage()}}}
-function quizResults(){const score=state.quizAnswers.filter((x,j)=>x===QUIZ[j].correct).length;elContent.innerHTML=`${header('KNOWLEDGE CHECK','Quiz complete','Review the explanations and try again whenever you want.')}<section class="card quiz-card"><div class="results-splash"><div class="eyebrow">YOUR FINAL SCORE</div><strong>${score} / ${QUIZ.length}</strong><h2 style="margin:7px 0 14px">${score===12?'Perfect — excellent work!':score>=9?'Strong understanding!':score>=6?'Good progress!':'Keep exploring — you are learning!'}</h2><p class="muted">Best score on this device: ${best} / ${QUIZ.length}</p><div class="row wrap" style="justify-content:center;margin-top:21px"><button id="restart-results" class="btn primary">↻ Try again</button><a href="#/learn" class="btn">Back to lessons</a></div></div><div style="border-top:1px solid var(--line);padding-top:19px"><h3 style="margin-bottom:15px">Answer review</h3>${QUIZ.map((q,i)=>`<div style="margin-bottom:16px;padding:13px 15px;background:#132236;border:1px solid #283e52;border-radius:11px"><div style="color:${state.quizAnswers[i]===q.correct?'#81eab7':'#ffcf90'};font-weight:700;font-size:12px">${state.quizAnswers[i]===q.correct?'✓ Correct':'✗ Incorrect'} · Question ${i+1}</div><strong>${esc(q.q)}</strong><p class="small muted" style="margin:7px 0 0">${esc(q.explain)}</p></div>`).join('')}</div></section>${footer()}`;$('#restart-results').onclick=restartQuiz}
-function restartQuiz(){state.quizIndex=0;state.quizAnswers=[];state.quizFinal=false;quizPage()}
-function glossary(){setBread('Glossary');elContent.className='content';elContent.innerHTML=`${header('QUICK REFERENCE','8086 Glossary','Search the terminology you will encounter in pin diagrams, registers, instruction flow and bus timing.')}<div class="card card-pad" style="margin-bottom:20px;max-width:450px"><label for="glossary-filter" class="eyebrow">FILTER TERMS</label><input id="glossary-filter" autocomplete="off" placeholder="Type a term or definition..." style="display:block;margin-top:10px;width:100%;padding:12px;background:#0e1b2c;color:#eef5ff;border:1px solid #344b64;border-radius:9px"></div><div class="glossary-grid" id="glossary-items"></div>${footer()}`;$('#glossary-filter').addEventListener('input',drawGlossary);drawGlossary()}
-function drawGlossary(){let t=($('#glossary-filter')?.value||'').trim().toLowerCase(),matches=GLOSSARY.filter(([a,b])=>(a+' '+b).toLowerCase().includes(t));$('#glossary-items').innerHTML=matches.map(([a,b])=>`<div class="card glossary-card"><h3>${esc(a)}</h3><p>${esc(b)}</p></div>`).join('')||'<div class="filtered-empty">No matching terms found.</div>'}
-function notFound(){setBread('Not found');elContent.className='content';elContent.innerHTML=`${header('404','That page was not found','Try one of the sections in the navigation.')}<a href="#/overview" class="btn primary">Go to overview →</a>`}
-function render(){const r=getRoute(),parts=r.split('/').filter(Boolean);if(parts[0]==='overview'||!parts[0])overview();else if(parts[0]==='learn'&&parts[1])lessonPage(parts[1]);else if(parts[0]==='learn')learnList();else if(parts[0]==='pinout')pinout();else if(parts[0]==='labs')labsPage();else if(parts[0]==='lab')labPage(parts[1]);else if(parts[0]==='quiz')quizPage();else if(parts[0]==='glossary')glossary();else notFound();updateSide();closeMobile();scrollTo({top:0,behavior:'instant'});}
-let toastTimer;function toast(s){document.querySelector('.toast')?.remove();const el=document.createElement('div');el.className='toast';el.role='status';el.textContent=s;document.body.append(el);clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.remove(),2500)}
-function closeMobile(){state.mobile=false;$('#sidebar').classList.remove('open');$('#overlay').classList.remove('open');$('#mobile-toggle').setAttribute('aria-expanded','false')}
-$('#mobile-toggle').onclick=()=>{state.mobile=!state.mobile;$('#sidebar').classList.toggle('open',state.mobile);$('#overlay').classList.toggle('open',state.mobile);$('#mobile-toggle').setAttribute('aria-expanded',String(state.mobile))};$('#overlay').onclick=closeMobile;
-const gs=$('#global-search'),res=$('#search-results');
-function indexSearch(){return [...LESSONS.map(l=>({kind:'Lesson',title:l.title,desc:l.subtitle,url:'#/learn/'+l.id,hay:l.body.replace(/<[^>]*>/g,' ')})),...LABS.map(l=>({kind:'Interactive lab',title:l.title,desc:l.kind,url:'#/lab/'+l.id,hay:l.desc+' '+l.guide})),...GLOSSARY.map(g=>({kind:'Glossary',title:g[0],desc:g[1],url:'#/glossary',hay:g[1]})),...PINS.map(p=>({kind:'Pin '+p.n,title:p.name,desc:p.desc,url:'#/pinout?pin='+p.n,hay:p.min+' '+p.max+' '+p.type}))]}
-const searchable=indexSearch();function searchResults(){const term=gs.value.trim().toLowerCase();if(!term){res.hidden=true;return}const matches=searchable.filter(x=>(x.title+' '+x.desc+' '+x.hay+' '+x.kind).toLowerCase().includes(term)).slice(0,9);res.hidden=false;res.innerHTML=matches.length?matches.map(x=>`<button type="button" class="search-result" data-url="${esc(x.url)}"><span>${esc(x.kind)}</span><strong>${esc(x.title)}</strong><small>${esc(x.desc).slice(0,100)}</small></button>`).join(''):'<div class="filtered-empty">Nothing found. Try a pin name, unit or concept.</div>';res.querySelectorAll('[data-url]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.url;gs.value='';res.hidden=true;if(location.hash===b.dataset.url)render()})}
-gs.addEventListener('input',searchResults);gs.addEventListener('keydown',e=>{if(e.key==='Enter'){res.querySelector('[data-url]')?.click()};if(e.key==='Escape'){gs.blur();res.hidden=true}});document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){e.preventDefault();gs.focus()}if(e.key==='Escape'){closeMobile();res.hidden=true}});document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))res.hidden=true});
-addEventListener('hashchange',render);
-if(!location.hash)location.hash='#/overview';render();
+const $ = id => document.getElementById(id);
+const ICONS = {
+  box: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="m3.6 8 8.4-5 8.4 5M12 3v17M3 8l9 5 9-5"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  cpu: '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/><rect x="9" y="9" width="6" height="6" rx="1"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 5-5 4 4 3-3 6 6"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-2 2"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3A5 5 0 0 0 11 21l2-2"/>',
+  external: '<path d="M14 3h7v7m0-7-10 10"/><path d="M20 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/>',
+  maximize: '<path d="M8 3H3v5m0-5 6 6m7-6h5v5m0-5-6 6M3 16v5h5m-5 0 6-6m7 6h5v-5m0 5-6-6"/>',
+  minimize: '<path d="M9 9H3M3 3v6m0 0 6-6m6 6h6m0-6v6m0 0-6-6M9 15H3m0 6v-6m0 0 6 6m6-6h6m0 6v-6m0 0-6 6"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2 6"/><path d="M20 4v7h-7"/>',
+  mouse: '<rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 2v7"/>',
+  left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', close: '<path d="M18 6 6 18M6 6l12 12"/>',
+  layers: '<path d="m12 2 9 5-9 5-9-5 9-5Zm-9 10 9 5 9-5M3 17l9 5 9-5"/>',
+  play: '<path d="m8 5 11 7-11 7V5Z"/>',
+};
+const icon = (name, size=18) => `<svg viewBox="0 0 24 24" aria-hidden="true" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">${ICONS[name] || ICONS.box}</svg>`;
+document.querySelectorAll('.icon[data-icon]').forEach(node => { node.innerHTML=icon(node.dataset.icon); });
+
+let current = MODELS[0];
+let view = 'viewer';
+let galleryFilter = 'all';
+let timer = 0;
+const frame = $('model-frame');
+const stage = $('stage');
+const loader = $('stage-loading');
+
+function navGroup(title,items){
+  return `<section class="nav-section"><div class="nav-section-title">${title}<span>${String(items.length).padStart(2,'0')}</span></div>${items.map(m=>{
+    const i=MODELS.indexOf(m)+1;
+    return `<button type="button" class="model-nav-item ${current.id===m.id?'active':''}" data-model="${m.id}" aria-current="${current.id===m.id?'true':'false'}"><span class="model-icon ${m.category}">${icon(m.category==='pinout'?'cpu':m.visual==='diagram'?'layers':'box')}</span><span class="nav-model-copy"><strong>${m.label}</strong><small>${m.small}</small></span><span class="nav-model-num">${String(i).padStart(2,'0')}</span></button>`;
+  }).join('')}</section>`;
+}
+function renderNav(){
+  $('model-nav').innerHTML = navGroup('3D Architecture',MODELS.slice(0,3)) + navGroup('3D Pin Models',MODELS.slice(3,5)) + navGroup('Additional Model',MODELS.slice(5));
+  $('model-nav').querySelectorAll('[data-model]').forEach(b=>b.addEventListener('click',()=>switchModel(b.dataset.model)));
+}
+function closeSidebar(){ $('model-sidebar').classList.remove('is-open');$('sidebar-shade').classList.remove('active');$('mobile-models').setAttribute('aria-expanded','false'); }
+$('mobile-models').addEventListener('click',()=>{let opening=!$('model-sidebar').classList.contains('is-open');$('model-sidebar').classList.toggle('is-open',opening);$('sidebar-shade').classList.toggle('active',opening);$('mobile-models').setAttribute('aria-expanded',String(opening));});
+$('sidebar-shade').addEventListener('click',closeSidebar);
+
+function updateFrame(model,force=false){
+  if(force || frame.dataset.model!==model.id){
+    loader.hidden=false;loader.classList.remove('loaded');
+    window.clearTimeout(timer);
+    frame.title=`${model.label} — interactive Intel 8086 visualization`;
+    frame.dataset.model=model.id;
+    frame.src=model.file;
+    timer=window.setTimeout(()=>{loader.hidden=true;},12000);
+  }
+}
+frame.addEventListener('load',()=>{window.clearTimeout(timer);loader.classList.add('loaded');window.setTimeout(()=>{loader.hidden=true;},260);});
+function updateViewer(model){
+  let number=String(MODELS.indexOf(model)+1).padStart(2,'0');
+  $('model-eyebrow').innerHTML=`${model.type} <span class="crumb-sep">/</span> MODEL ${number} OF 06`;
+  $('model-heading').textContent=model.label;
+  $('model-summary').textContent=model.summary;
+  $('model-features').innerHTML=model.features.map(f=>`<span class="feature-tag">${f}</span>`).join('');
+  $('stage-index').textContent=`${number} / 06`;
+  $('stage-hint').textContent=model.hint;
+  $('usage-tip').textContent=model.notes;
+  $('open-standalone').href=model.file;
+  updateFrame(model);
+}
+function setView(next){
+  view=next;
+  $('viewer-view').hidden=next!=='viewer';
+  $('gallery-view').hidden=next!=='gallery';
+  $('viewer-tab').setAttribute('aria-pressed',String(next==='viewer'));
+  $('gallery-tab').setAttribute('aria-pressed',String(next==='gallery'));
+  document.title=next==='gallery'?'Model Gallery — 8086 Visual Lab':`${current.label} — 8086 Visual Lab`;
+  if(next==='gallery')renderGallery();
+  window.scrollTo({top:0,behavior:'instant'});
+  closeSidebar();
+}
+function route(){
+  const hash=decodeURIComponent(location.hash||'');
+  if(hash==='#/gallery'){setView('gallery');return;}
+  const m=hash.match(/^#\/model\/([a-z0-9-]+)$/);
+  const found=m?MODELS.find(x=>x.id===m[1]):null;
+  current=found||MODELS[0];
+  updateViewer(current);
+  renderNav();
+  setView('viewer');
+}
+function switchModel(id){
+  const model=MODELS.find(x=>x.id===id);
+  if(!model)return;
+  if(location.hash!==`#/model/${id}`)location.hash=`#/model/${id}`;
+  else route();
+}
+$('gallery-tab').addEventListener('click',()=>{location.hash='#/gallery';});
+$('viewer-tab').addEventListener('click',()=>switchModel(current.id));
+$('featured-start').addEventListener('click',()=>switchModel(MODELS[0].id));
+$('reload-model').addEventListener('click',()=>updateFrame(current,true));
+$('prev-model').addEventListener('click',()=>switchModel(MODELS[(MODELS.indexOf(current)+MODELS.length-1)%MODELS.length].id));
+$('next-model').addEventListener('click',()=>switchModel(MODELS[(MODELS.indexOf(current)+1)%MODELS.length].id));
+$('fullscreen-button').addEventListener('click',async()=>{
+  try {if(document.fullscreenElement)await document.exitFullscreen();else if(stage.requestFullscreen)await stage.requestFullscreen(); else {frame.contentWindow?.focus();}}
+  catch(e){notify('Fullscreen is unavailable in this browser. Try opening the model in a new tab.');}
+});
+document.addEventListener('fullscreenchange',()=>{
+  const yes=Boolean(document.fullscreenElement);
+  $('fullscreen-button').innerHTML=icon(yes?'minimize':'maximize')+`<span class="hide-mobile">${yes?'Exit fullscreen':'Fullscreen'}</span>`;
+  stage.classList.toggle('is-fullscreen',yes);
+});
+function notify(message){const t=$('toast');t.textContent=message;t.classList.add('visible');window.clearTimeout(notify.timer);notify.timer=window.setTimeout(()=>t.classList.remove('visible'),2500);}
+$('copy-link').addEventListener('click',async()=>{
+  const url=location.href.split('#')[0]+`#/model/${current.id}`;
+  try {await navigator.clipboard.writeText(url);notify('Direct link copied');}
+  catch {const element=document.createElement('textarea');element.value=url;document.body.appendChild(element);element.select();try{document.execCommand('copy');notify('Direct link copied');}catch{notify('Copy the model URL from your address bar');}element.remove();}
+});
+
+const diagram=() => `<div class="visual-diagram"><div class="viz-glow"></div><div class="diagram-biu">BIU<div class="diagram-item">QUEUE</div><div class="diagram-item wide">ADDRESS ADDER</div></div><div class="diagram-arrows">⇅</div><div class="diagram-eu">EU<div class="diagram-item">REGISTERS</div><div class="diagram-item wide">ALU / FLAGS</div></div></div>`;
+const modelIllustration=m=>{
+  if(m.visual==='chip'||m.visual==='classic-chip')return `<div class="visual-illustration chip-illustration ${m.visual}"><div class="dippins leftpins">${Array(12).fill('<i></i>').join('')}</div><div class="dip"><div class="notch"></div><span>INTEL</span><b>8086</b><small>40 PIN DIP</small></div><div class="dippins rightpins">${Array(12).fill('<i></i>').join('')}</div></div>`;
+  if(m.visual==='diagram')return `<div class="visual-illustration diagram-illustration">${diagram()}</div>`;
+  return `<div class="visual-illustration architecture-illustration ${m.visual}"><div class="plane-shadow"></div>${diagram()}<div class="float-chip one"></div><div class="float-chip two"></div></div>`;
+};
+function renderGallery(){
+  $('gallery-grid').innerHTML=MODELS.filter(m=>galleryFilter==='all'||galleryFilter===m.category).map(m=>`
+    <button type="button" class="gallery-card" data-model="${m.id}" aria-label="Open ${m.label}">
+      <div class="gallery-art ${m.category}">${modelIllustration(m)}<span class="art-badge">${m.type.startsWith('2D')?'2D':'3D'} INTERACTIVE</span></div>
+      <div class="gallery-card-body"><div class="card-topline">${m.type}<span>${String(MODELS.indexOf(m)+1).padStart(2,'0')} / 06</span></div><h3>${m.label}</h3><p>${m.summary}</p><div class="card-bottom"><span>${m.features.slice(0,2).join('  ·  ')}</span><span class="card-open">${icon('right')}</span></div></div>
+    </button>`).join('');
+  $('gallery-grid').querySelectorAll('[data-model]').forEach(b=>b.addEventListener('click',()=>switchModel(b.dataset.model)));
+}
+$('gallery-filters').querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{
+  galleryFilter=b.dataset.filter;
+  $('gallery-filters').querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));
+  renderGallery();
+}));
+
+function openReference(){ $('reference-modal').hidden=false; document.body.classList.add('modal-open');$('reference-close').focus(); }
+function closeReference(){ $('reference-modal').hidden=true;document.body.classList.remove('modal-open');$('reference-button').focus(); }
+$('reference-button').addEventListener('click',openReference);
+$('reference-close').addEventListener('click',closeReference);
+$('reference-modal').addEventListener('click',e=>{if(e.target===$('reference-modal'))closeReference();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(!$('reference-modal').hidden)closeReference();else closeSidebar();}
+  if(e.target.matches('input,textarea,select')||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(/^[1-6]$/.test(e.key)&&$('reference-modal').hidden)switchModel(MODELS[Number(e.key)-1].id);
+});
+window.addEventListener('hashchange',route);
+renderNav();
+route();
